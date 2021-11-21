@@ -1,0 +1,32 @@
+grpc:
+  client:
+    modbusServiceAdapter:
+      address: "static://192.168.0.7:9090"
+      negotiationType: PLAINTEXT
+
+monitoring:
+  electricityDevices:
+  - deviceName: ProductionMeter
+    functions:
+    - functionName: "CURRENT_POWER"
+      readInterval: 10
+      alias: "Instant Production"
+      readingType: com.gcs.smarthome.logic.ElectricReading.InstantProductionPower
+    - functionName: EXPORT_POWER
+      readInterval: 120
+      alias: "Energy Production"
+      readingType: com.gcs.smarthome.logic.ElectricReading.ProducedPower
+  - deviceName: MainMeter
+    functions:
+    - functionName: CURRENT_POWER
+      readInterval: 10
+      alias: "Instant Power Balance"
+      readingType: com.gcs.smarthome.logic.ElectricReading.InstantTotalPower
+    - functionName: IMPORT_POWER
+      readInterval: 120
+      alias: "Power Import"
+      readingType: com.gcs.smarthome.logic.ElectricReading.ImportedPower
+    - functionName: EXPORT_POWER
+      readInterval: 120
+      alias: "Power Export"
+      readingType: com.gcs.smarthome.logic.ElectricReading.ExportedPower
