@@ -134,6 +134,31 @@
 			</plugin>
 
 			<plugin>
+				<artifactId>exec-maven-plugin</artifactId>
+				<groupId>org.codehaus.mojo</groupId>
+				<version>3.0.0</version>
+				<executions>
+					<execution>
+						<id>Generate layer directories</id>
+						<phase>package</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<executable>java</executable>
+							<workingDirectory>${project.build.directory}</workingDirectory>
+							<arguments>
+								<argument>-Djarmode=layertools</argument>
+								<argument>-jar</argument>
+								<argument>${project.artifactId}-${project.version}.jar</argument>
+								<argument>extract</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<plugin>
 				<groupId>io.fabric8</groupId>
 				<artifactId>docker-maven-plugin</artifactId>
 				<version>0.37.0</version>
