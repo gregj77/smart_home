@@ -11,7 +11,7 @@
 	<groupId>com.gcs</groupId>
 	<artifactId>smarthome</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>Smart Home data analysis</name>
+	<name>smart-home</name>
 	<description>Consumer of smart home data to provide analytics</description>
 	<properties>
 		<java.version>11</java.version>
