@@ -9,7 +9,9 @@ import net.devh.boot.grpc.client.inject.GrpcClient
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import reactor.core.publisher.Flux
+import reactor.util.retry.RetrySpec
 import java.lang.reflect.Constructor
+import java.time.Duration
 
 @Configuration
 class ElectricPowerMonitoringConfig(private val monitoringConfiguration: MonitoringConfiguration) {
@@ -94,6 +96,8 @@ class ElectricPowerMonitoringConfig(private val monitoringConfiguration: Monitor
                     sink.error(err)
                 }
             }
+            .doOnError{ logger.error { "failed to create stream - ${it.message} <${it.javaClass.name}>\n${it.stackTrace}" }}
+            .retryWhen(RetrySpec.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(5L)))
             .publish()
             .refCount()
     }

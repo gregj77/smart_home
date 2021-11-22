@@ -3,21 +3,28 @@ package com.gcs.smarthome.logic
 import com.gcs.smarthome.data.model.BusinessDay
 import com.gcs.smarthome.data.repository.BusinessDayRepository
 import com.gcs.smarthome.logic.cqrs.EventPublisher
+import com.google.common.util.concurrent.AtomicDouble
 import mu.KotlinLogging
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.atomic.AtomicReference
 import javax.transaction.Transactional
 
 @Service
 class BusinessDayHub (private val repository: BusinessDayRepository, private val eventPublisher: EventPublisher) {
     private val logger = KotlinLogging.logger {  }
+    private val businessDayDuration = AtomicDouble()
+    private val businessDayStart = AtomicReference(LocalDateTime.now())
 
     @EventListener(classes = [ApplicationReadyEvent::class])
     fun initialize() {
         initNewBusinessDay()
+        eventPublisher.broadcastEvent(ReportingService.commandRequestGauge("business_day_up", businessDayDuration))
     }
 
     @Scheduled(cron = "1 0 0 * * *")
@@ -25,6 +32,8 @@ class BusinessDayHub (private val repository: BusinessDayRepository, private val
         val (id, date) = createOrGetCurrentBusinessDay()
         logger.info { "broadcasting business day information for $date} = $id" }
         eventPublisher.broadcastEvent(BusinessDayAvailableEvent(id, date))
+        businessDayStart.set(LocalDateTime.now())
+        businessDayDuration.set(1.0)
     }
 
     @Scheduled(cron = "59 59 23 * * *")
@@ -32,6 +41,11 @@ class BusinessDayHub (private val repository: BusinessDayRepository, private val
         val (id, date) = createOrGetCurrentBusinessDay()
         logger.info { "broadcasting close of business day information for $date} = $id" }
         eventPublisher.broadcastEvent(BusinessDayCloseEvent(id, date))
+    }
+
+    @Scheduled(cron = "55 * * * * *")
+    protected fun trackBusinessDayProgress() {
+        businessDayDuration.set(ChronoUnit.SECONDS.between(businessDayStart.get(), LocalDateTime.now()).toDouble())
     }
 
     @Transactional

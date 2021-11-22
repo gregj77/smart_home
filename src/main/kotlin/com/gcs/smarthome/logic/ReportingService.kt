@@ -90,7 +90,7 @@ class ReportingService(
     @EventListener
     fun onHandleRequestGaugeCommand(cmd: RequestGaugeCommand) {
         cmd.applyEvent {
-            val key = Meter.Id(it.first, Tags.empty(), null, null, Meter.Type.GAUGE)
+            val key = Meter.Id(it.first, it.third, null, null, Meter.Type.GAUGE)
             meters.computeIfAbsent(key) { id ->
                 val storage = it.second
                 val gauge = meterRegistry.gauge(id.name, id.tags, storage) { storage.get() }
@@ -146,14 +146,14 @@ class ReportingService(
         override fun applyEvent(callback: (Pair<Meter.Id, Double>) -> Unit) = execute(callback)
     }
 
-    class RequestGaugeCommand(gaugeName: String, storage: AtomicDouble) :
-        GenericCommand<Pair<String, AtomicDouble>, Meter.Id>(Pair(gaugeName, storage)), EventInvoker<Pair<String, AtomicDouble>, Meter.Id> {
-        override fun applyEvent(callback: (Pair<String, AtomicDouble>) -> Meter.Id) = execute(callback)
+    class RequestGaugeCommand(gaugeName: String, storage: AtomicDouble, tags: Tags) :
+        GenericCommand<Triple<String, AtomicDouble, Tags>, Meter.Id>(Triple(gaugeName, storage, tags)), EventInvoker<Triple<String, AtomicDouble, Tags>, Meter.Id> {
+        override fun applyEvent(callback: (Triple<String, AtomicDouble, Tags>) -> Meter.Id) = execute(callback)
     }
 
     companion object {
         fun commandRequestCounter(counterName: String, initialReading: Double) = RequestCounterCommand(counterName, initialReading)
         fun commandUpdateCounter(id: Meter.Id, delta: Double) = UpdateCounterCommand(id, delta)
-        fun commandRequestGauge(gaugeName: String, storage: AtomicDouble) = RequestGaugeCommand(gaugeName, storage)
+        fun commandRequestGauge(gaugeName: String, storage: AtomicDouble, tags: Tags = Tags.empty()) = RequestGaugeCommand(gaugeName, storage, tags)
     }
 }
