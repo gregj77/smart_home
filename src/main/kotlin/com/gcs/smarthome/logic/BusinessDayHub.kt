@@ -11,6 +11,8 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.transaction.Transactional
@@ -19,12 +21,12 @@ import javax.transaction.Transactional
 class BusinessDayHub (private val repository: BusinessDayRepository, private val eventPublisher: EventPublisher) {
     private val logger = KotlinLogging.logger {  }
     private val businessDayDuration = AtomicDouble()
-    private val businessDayStart = AtomicReference(LocalDateTime.now())
 
     @EventListener(classes = [ApplicationReadyEvent::class])
     fun initialize() {
         initNewBusinessDay()
         eventPublisher.broadcastEvent(ReportingService.commandRequestGauge("business_day_up", businessDayDuration))
+        businessDayDuration.set(LocalTime.now().toSecondOfDay().toDouble())
     }
 
     @Scheduled(cron = "1 0 0 * * *")
@@ -32,8 +34,7 @@ class BusinessDayHub (private val repository: BusinessDayRepository, private val
         val (id, date) = createOrGetCurrentBusinessDay()
         logger.info { "broadcasting business day information for $date} = $id" }
         eventPublisher.broadcastEvent(BusinessDayAvailableEvent(id, date))
-        businessDayStart.set(LocalDateTime.now())
-        businessDayDuration.set(1.0)
+        businessDayDuration.set(LocalTime.now().toSecondOfDay().toDouble())
     }
 
     @Scheduled(cron = "59 59 23 * * *")
@@ -45,7 +46,7 @@ class BusinessDayHub (private val repository: BusinessDayRepository, private val
 
     @Scheduled(cron = "55 * * * * *")
     protected fun trackBusinessDayProgress() {
-        businessDayDuration.set(ChronoUnit.SECONDS.between(businessDayStart.get(), LocalDateTime.now()).toDouble())
+        businessDayDuration.set(LocalTime.now().toSecondOfDay().toDouble())
     }
 
     @Transactional
