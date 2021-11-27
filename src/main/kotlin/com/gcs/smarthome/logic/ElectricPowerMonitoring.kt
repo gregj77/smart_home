@@ -13,6 +13,7 @@ import reactor.util.retry.RetrySpec
 import java.math.BigDecimal
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
 
@@ -24,16 +25,18 @@ class ElectricPowerMonitoring(
 
     private val logger = KotlinLogging.logger {  }
 
-    private val isIntialized = AtomicBoolean(false)
+    private val isInitialized = AtomicBoolean(false)
     private val persistableReadingToken = Disposables.swap()
     private val currentPowerToken = Disposables.swap()
+    private val businessDay = AtomicInteger(0)
 
     @EventListener
-    fun onNewBusinessDay(day: BusinessDayHub.BusinessDayAvailableEvent) {
+    fun onNewBusinessDay(day: BusinessDayHub.BusinessDayOpenEvent) {
         logger.info { "business day starting $day" }
         persistableReadingToken.update(initializePersistableDataStream(dataStream))
-        if (!isIntialized.get()) {
-            isIntialized.set(true)
+        businessDay.set(day.businessDayId.toInt())
+        if (!isInitialized.get()) {
+            isInitialized.set(true)
             currentPowerToken.update(initializeInstantDataStream(dataStream))
         }
     }
@@ -58,15 +61,21 @@ class ElectricPowerMonitoring(
             }
             .flatMap {
                 logger.info { "received first entry for ${it.key().first}.${it.key().second} for current business day, requesting initial reading..." }
-                val args = DeviceReadingHub.queryLatestDeviceReading(it.key().second)
+                val readDeltaArgs = DeviceReadingHub.queryDailyDeltaDeviceReading(it.key().second, businessDay.get())
+                val lastReadingArgs = DeviceReadingHub.queryLatestDeviceReading(it.key().second)
+
                 eventPublisher
-                    .query(args, it) { ctx, reading -> PersistenceContext(ctx.key().first, ctx.key().second, reading, ctx) }
-                    .retryWhen(RetrySpec.fixedDelay(10L, Duration.ofSeconds(5L)))
+                    .query(lastReadingArgs, it){ ctx, reading -> PersistenceContext(ctx.key().first, ctx.key().second, reading, ctx) }
+                    .flatMap {
+                        eventPublisher
+                            .query(readDeltaArgs, it) { ctx, reading -> ctx.updateDailyDelta(reading) }
+                            .retryWhen(RetrySpec.fixedDelay(10L, Duration.ofSeconds(5L)))
+                    }
             }
             .flatMap { ctx ->
                 logger.info { "initial reading for ${ctx.alias}.${ctx.deviceType} = ${ctx.reading}, setting up counter..." }
                 eventPublisher
-                    .command(ReportingService.commandRequestCounter(ctx.alias, ctx.reading.toDouble()), ctx ) { c, id -> c.updateMeterId(id) }
+                    .command(ReportingService.commandRequestCounter(ctx.alias, ctx.dailyDelta?.toDouble() ?: 0.0), ctx ) { c, id -> c.updateMeterId(id) }
                     .retryWhen(RetrySpec.fixedDelay(10L, Duration.ofSeconds(5L)))
             }
             .flatMap { ctx ->
@@ -135,10 +144,15 @@ class ElectricPowerMonitoring(
         val reading: BigDecimal,
         val stream: Flux<out ElectricReading>) {
 
+        var dailyDelta: BigDecimal? = null
         var meterId: Meter.Id? = null
 
         fun updateMeterId(id: Meter.Id): PersistenceContext {
             meterId = id
+            return this
+        }
+        fun updateDailyDelta(delta: BigDecimal): PersistenceContext {
+            dailyDelta = delta
             return this
         }
     }

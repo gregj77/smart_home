@@ -9,32 +9,49 @@ import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
+import reactor.core.Disposable
+import reactor.core.Disposables
+import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
+import reactor.util.retry.Retry
+import java.time.Duration
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.ZoneOffset
-import java.time.temporal.ChronoUnit
-import java.util.concurrent.atomic.AtomicReference
-import javax.transaction.Transactional
+import java.time.ZoneId
+import javax.annotation.PreDestroy
 
 @Service
 class BusinessDayHub (private val repository: BusinessDayRepository, private val eventPublisher: EventPublisher) {
     private val logger = KotlinLogging.logger {  }
     private val businessDayDuration = AtomicDouble()
+    private var token: Disposable = Disposables.disposed()
 
     @EventListener(classes = [ApplicationReadyEvent::class])
     fun initialize() {
         initNewBusinessDay()
-        eventPublisher.broadcastEvent(ReportingService.commandRequestGauge("business_day_up", businessDayDuration))
-        businessDayDuration.set(LocalTime.now().toSecondOfDay().toDouble())
+        eventPublisher.command(ReportingService.commandRequestGauge("business_day_up", businessDayDuration))
+            .retryWhen(Retry.fixedDelay(6, Duration.ofSeconds(10)))
+            .subscribe { id ->
+                logger.info { "configured business_day_up gauge $id, setting up refresh " }
+                token = Flux
+                    .interval(Duration.ofSeconds(0), Duration.ofSeconds(5L), Schedulers.parallel())
+                    .map { LocalTime.now(ZoneId.systemDefault()).toSecondOfDay().toDouble() }
+                    .subscribe { businessDayDuration.set(it) }
+            }
+
+        businessDayDuration.set(LocalTime.now(ZoneId.systemDefault()).toSecondOfDay().toDouble())
+    }
+
+    @PreDestroy
+    fun destroy() {
+        token.dispose()
     }
 
     @Scheduled(cron = "1 0 0 * * *")
     protected fun initNewBusinessDay() {
         val (id, date) = createOrGetCurrentBusinessDay()
         logger.info { "broadcasting business day information for $date} = $id" }
-        eventPublisher.broadcastEvent(BusinessDayAvailableEvent(id, date))
-        businessDayDuration.set(LocalTime.now().toSecondOfDay().toDouble())
+        eventPublisher.broadcastEvent(BusinessDayOpenEvent(id, date))
     }
 
     @Scheduled(cron = "59 59 23 * * *")
@@ -44,13 +61,7 @@ class BusinessDayHub (private val repository: BusinessDayRepository, private val
         eventPublisher.broadcastEvent(BusinessDayCloseEvent(id, date))
     }
 
-    @Scheduled(cron = "55 * * * * *")
-    protected fun trackBusinessDayProgress() {
-        businessDayDuration.set(LocalTime.now().toSecondOfDay().toDouble())
-    }
-
-    @Transactional
-    protected fun createOrGetCurrentBusinessDay(): Pair<Short, LocalDate> {
+    private fun createOrGetCurrentBusinessDay(): Pair<Short, LocalDate> {
         val businessDay = repository.findFirstByReferenceEquals(LocalDate.now())
         val result = if (businessDay.isEmpty) {
             val newBusinessDay = BusinessDay(LocalDate.now())
@@ -64,6 +75,6 @@ class BusinessDayHub (private val repository: BusinessDayRepository, private val
         return Pair(result.id, result.reference)
     }
 
-    data class BusinessDayAvailableEvent(val businessDayId: Short, val date: LocalDate)
+    data class BusinessDayOpenEvent(val businessDayId: Short, val date: LocalDate)
     data class BusinessDayCloseEvent(val businessDayId: Short, val date: LocalDate)
 }

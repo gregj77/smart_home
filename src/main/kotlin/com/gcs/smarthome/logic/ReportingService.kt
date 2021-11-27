@@ -31,7 +31,7 @@ class ReportingService(
 
 
     @EventListener
-    fun onBusinessDayStart(day: BusinessDayHub.BusinessDayAvailableEvent) {
+    fun onBusinessDayStart(day: BusinessDayHub.BusinessDayOpenEvent) {
         logger.info { "initializing reporting service for $day" }
         synchronized(meters) {
             updateDailyCounters()
@@ -53,6 +53,13 @@ class ReportingService(
         }
     }
 
+    @EventListener(condition = "#args.isPowerReading()")
+    fun onNewElectricityReading(args: NewReferenceReading) {
+        logger.info { "got power reading $args" }
+        val (_, storage) = internalRequestGauge("last_power_storage_reading", AtomicDouble(), null)
+        storage.set(args.value.toDouble())
+    }
+
     protected fun updateDailyCounters() {
         val report = businessDayRepository
             .loadDeviceDailyReport(deviceTypes)
@@ -68,7 +75,7 @@ class ReportingService(
         report.forEach { (type, freshReports) ->
             cfg.metricsMapping[type]?.let { alias ->
                 freshReports.forEach { report ->
-                    val id = internalRequestCounter(alias, report.date, report.value.toDouble())
+                    val id = internalRequestCounter(alias, report.value.toDouble(), report.date, Tags.empty()).first
                     existingTags.remove(id)
                 }
             }
@@ -84,21 +91,12 @@ class ReportingService(
 
     @EventListener
     fun onHandleRequestCounterCommand(cmd: RequestCounterCommand) {
-        cmd.applyEvent { internalRequestCounter(it.first, LocalDate.now(), it.second) }
+        cmd.applyEvent { internalRequestCounter(it.first, it.second, LocalDate.now(), Tags.empty()).first }
     }
 
     @EventListener
     fun onHandleRequestGaugeCommand(cmd: RequestGaugeCommand) {
-        cmd.applyEvent {
-            val key = Meter.Id(it.first, it.third, null, null, Meter.Type.GAUGE)
-            meters.computeIfAbsent(key) { id ->
-                val storage = it.second
-                val gauge = meterRegistry.gauge(id.name, id.tags, storage) { storage.get() }
-                logger.info { "request to create gauge $id completed" }
-                gauge
-            }
-            key
-        }
+        cmd.applyEvent { internalRequestGauge(it.first, it.second, null, it.third).first }
     }
 
     @EventListener
@@ -113,15 +111,29 @@ class ReportingService(
         }
     }
 
-    private fun internalRequestCounter(name: String, date: LocalDate, reading: Double): Meter.Id {
-        val key = Meter.Id(name, tagForDailyMeter(date), null, null, Meter.Type.COUNTER)
-        meters.computeIfAbsent(key) { id ->
+    private fun internalRequestGauge(name: String, storage: AtomicDouble, date: LocalDate?, providedTags: Tags = Tags.empty()): Pair<Meter.Id, AtomicDouble> {
+        val tags = (date?.let { tagForDailyMeter(it) } ?: Tags.empty()).and(providedTags)
+
+        val key = Meter.Id(name, tags, null, null, Meter.Type.GAUGE)
+        val boundStorage = meters.computeIfAbsent(key) { id ->
+            val gauge = meterRegistry.gauge(id.name, id.tags, storage) { storage.get() }
+            logger.info { "request to create gauge $id completed" }
+            gauge
+        }
+        return Pair(key, boundStorage as AtomicDouble)
+    }
+
+    private fun internalRequestCounter(name: String, reading: Double, date: LocalDate?, providedTags: Tags): Pair<Meter.Id, Counter> {
+        val tags = (date?.let { tagForDailyMeter(it) } ?: Tags.empty()).and(providedTags)
+
+        val key = Meter.Id(name, tags, null, null, Meter.Type.COUNTER)
+        val counter = meters.computeIfAbsent(key) { id ->
             val counter = meterRegistry.counter(id.name, id.tags)
             counter.increment(reading)
             logger.info { "request to create counter $id with initial value of $reading completed" }
             counter
         }
-        return key
+        return Pair(key, counter as Counter)
     }
 
     private fun internalRemoveMeters(meterIds: Collection<Meter.Id>) {

@@ -19,7 +19,7 @@ class BusinessDay (val reference: LocalDate) {
 
     @JoinColumn(name = "businessDayId")
     @OneToMany(fetch = FetchType.LAZY)
-    val readings: List<DeviceReading> = emptyList()
+    var readings: List<DeviceReading> = emptyList()
 
 
     override fun equals(other: Any?): Boolean {

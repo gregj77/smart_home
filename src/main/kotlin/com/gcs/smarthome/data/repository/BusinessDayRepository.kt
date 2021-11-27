@@ -14,7 +14,7 @@ import java.util.*
 interface BusinessDayRepository : JpaRepository<BusinessDay, Short> {
     fun findFirstByReferenceEquals(now: LocalDate = LocalDate.now()) : Optional<BusinessDay>
 
-    @Query("SELECT MAX(value) AS VALUE, device_type as deviceType, bd.reference AS date " +
+    @Query("SELECT (MAX(value) - MIN(value)) AS VALUE, device_type as deviceType, bd.reference AS date " +
             "FROM device_reading dr JOIN business_day bd ON dr.business_day_id = bd.id " +
             "WHERE bd.reference BETWEEN :start AND :end " +
             "AND dr.device_type IN (:types) " +

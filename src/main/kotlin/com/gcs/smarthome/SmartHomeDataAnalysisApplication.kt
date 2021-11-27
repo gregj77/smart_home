@@ -5,10 +5,14 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.boot.runApplication
 import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.annotation.EnableScheduling
+import org.springframework.transaction.annotation.EnableTransactionManagement
+import org.springframework.web.reactive.config.EnableWebFlux
 
 @EnableAsync
 @EnableScheduling
+@EnableWebFlux
 @SpringBootApplication
+@EnableTransactionManagement
 @ConfigurationPropertiesScan(basePackageClasses = [SmartHomeDataAnalysisApplication::class])
 class SmartHomeDataAnalysisApplication {
 
