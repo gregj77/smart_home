@@ -2,6 +2,7 @@ package com.gcs.smarthome.config
 
 import com.google.common.util.concurrent.AtomicDouble
 import io.micrometer.core.instrument.MeterRegistry
+import mu.KotlinLogging
 import org.springframework.context.annotation.Bean
 import org.springframework.http.HttpHeaders.AUTHORIZATION
 import org.springframework.scheduling.annotation.Scheduled
@@ -20,6 +21,7 @@ import kotlin.random.Random
 class WebConfig(meterRegistry: MeterRegistry) {
 
     private val tokenValue = AtomicDouble(nextTokenValue().toDouble())
+    private val logger = KotlinLogging.logger {  }
 
     init {
         meterRegistry.gauge("access_token", tokenValue) { tokenValue.get() }
@@ -40,7 +42,10 @@ class WebConfig(meterRegistry: MeterRegistry) {
     private fun accessChecker(): ReactiveAuthorizationManager<AuthorizationContext> {
         return ReactiveAuthorizationManager<AuthorizationContext> { _, ctx ->
             val currentToken = tokenValue.get().toLong().toString()
-            Mono.just(AuthorizationDecision( currentToken == ctx.exchange.request.headers.getFirst(AUTHORIZATION)))
+            val providedToken = ctx.exchange.request.headers.getFirst(AUTHORIZATION)
+            val result = currentToken == providedToken
+            logger.info { "provided: $providedToken, expected: $currentToken, decision: $result" }
+            Mono.just(AuthorizationDecision(result))
         }
     }
 
