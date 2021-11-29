@@ -15,7 +15,6 @@ import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.LocalTime
 import javax.transaction.Transactional
-import kotlin.math.log
 
 @Service
 class ReferenceStateHub(private val repository: ReferenceStateRepository,
@@ -23,17 +22,20 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
                         private val eventPublisher: EventPublisher) {
     private val logger = KotlinLogging.logger {  }
 
+    private var businessDayId: Short = 0
+
     @EventListener
     @Transactional
-    fun onStoreNewReading(args: StoreLatestReferenceCommand) {
+    fun onStoreLatestReferenceReadingCommand(args: StoreLatestReferenceCommand) {
         args.applyEvent {
             val result = handleLatestReferenceReading(it)
 
             val allEntries = repository.findAllByReferenceTypeOrderByBusinessDayDesc(result.referenceType)
 
             if (allEntries.first().id == result.id) {
-                logger.info { "broadcasting update event" }
-                eventPublisher.broadcastEvent(NewReferenceReading(result.referenceType, result.value, result.importReading?.id, result.exportReading?.id))
+                val event = NewReferenceReading(result.referenceType, result.value, result.importReading?.id, result.importReading?.value, result.exportReading?.id, result.exportReading?.value)
+                logger.info { "broadcasting update event $event" }
+                eventPublisher.broadcastEvent(event)
             }
 
             result.id.toInt()
@@ -41,20 +43,22 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
     }
 
     @EventListener
+    @Transactional
     fun onNewBusinessDay(args: BusinessDayHub.BusinessDayOpenEvent) {
+        businessDayId = args.businessDayId
         ReferenceType
             .values()
             .map { repository.findFirstByReferenceTypeOrderByBusinessDayDesc(it) }
             .filterNot { it.isEmpty }
             .map { it.get() }
             .forEach {
-                val event = NewReferenceReading(it.referenceType, it.value, it.importReading?.id, it.exportReading?.id)
+                val event = NewReferenceReading(it.referenceType, it.value, it.importReading?.id, it.importReading?.value, it.exportReading?.id, it.exportReading?.value)
                 logger.info { "broadcasting $event..." }
                 eventPublisher.broadcastEvent(event)
             }
     }
 
-    protected fun handleLatestReferenceReading(reading: Reading): ReferenceState {
+    private fun handleLatestReferenceReading(reading: Reading): ReferenceState {
         logger.info { "received new reading - $reading" }
         val businessDay = businessDayRepository.findFirstByReferenceEquals(reading.readingDate)
         if (businessDay.isEmpty) {
@@ -108,8 +112,10 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
 data class NewReferenceReading(
     val referenceType: ReferenceType,
     val value: BigDecimal,
-    val importReadingValue: Int?,
-    val exportReadingId: Int?
+    val importReadingId: Int?,
+    val importReadingValue: BigDecimal?,
+    val exportReadingId: Int?,
+    val exportReadingValue: BigDecimal?
 ) {
     fun isPowerReading() = referenceType == ReferenceType.POWER_READING
 }

@@ -39,8 +39,7 @@ class WebConfig(meterRegistry: MeterRegistry) {
 
     private fun accessChecker(): ReactiveAuthorizationManager<AuthorizationContext> {
         return ReactiveAuthorizationManager<AuthorizationContext> { _, ctx ->
-            //val currentToken = tokenValue.get().toLong().toString()
-            val currentToken = "5665968114827399168"
+            val currentToken = tokenValue.get().toLong().toString()
             Mono.just(AuthorizationDecision( currentToken == ctx.exchange.request.headers.getFirst(AUTHORIZATION)))
         }
     }

@@ -3,7 +3,7 @@ package com.gcs.smarthome.logic
 import com.gcs.smarthome.data.model.DeviceType
 import com.gcs.smarthome.logic.cqrs.EventPublisher
 import com.google.common.util.concurrent.AtomicDouble
-import io.micrometer.core.instrument.Meter
+import io.micrometer.core.instrument.Tags
 import mu.KotlinLogging
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
@@ -20,7 +20,8 @@ import javax.annotation.PreDestroy
 @Service
 class ElectricPowerMonitoring(
     private val dataStream: Flux<out ElectricReading>,
-    private val eventPublisher: EventPublisher
+    private val eventPublisher: EventPublisher,
+    private val meterService: MeterService
     ) {
 
     private val logger = KotlinLogging.logger {  }
@@ -61,34 +62,29 @@ class ElectricPowerMonitoring(
             }
             .flatMap {
                 logger.info { "received first entry for ${it.key().first}.${it.key().second} for current business day, requesting initial reading..." }
-                val readDeltaArgs = DeviceReadingHub.queryDailyDeltaDeviceReading(it.key().second, businessDay.get())
                 val lastReadingArgs = DeviceReadingHub.queryLatestDeviceReading(it.key().second)
+                val readDeltaArgs = DeviceReadingHub.queryDailyDeltaDeviceReading(it.key().second, businessDay.get())
 
                 eventPublisher
-                    .query(lastReadingArgs, it){ ctx, reading -> PersistenceContext(ctx.key().first, ctx.key().second, reading, ctx) }
-                    .flatMap {
-                        eventPublisher
-                            .query(readDeltaArgs, it) { ctx, reading -> ctx.updateDailyDelta(reading) }
-                            .retryWhen(RetrySpec.fixedDelay(10L, Duration.ofSeconds(5L)))
-                    }
-            }
-            .flatMap { ctx ->
-                logger.info { "initial reading for ${ctx.alias}.${ctx.deviceType} = ${ctx.reading}, setting up counter..." }
-                eventPublisher
-                    .command(ReportingService.commandRequestCounter(ctx.alias, ctx.dailyDelta?.toDouble() ?: 0.0), ctx ) { c, id -> c.updateMeterId(id) }
+                    .query(lastReadingArgs)
+                    .zipWith(eventPublisher.query(readDeltaArgs))
                     .retryWhen(RetrySpec.fixedDelay(10L, Duration.ofSeconds(5L)))
+                    .map { readingAndDelta -> PersistenceContext(it.key().first, it.key().second, readingAndDelta.t1, readingAndDelta.t2, it)}
             }
             .flatMap { ctx ->
                 logger.info { "counter configured, starting to calculate increments for ${ctx.alias}.${ctx.deviceType}..." }
                 var lastReading = ctx.reading
+                var isFirstReading = true
+                eventPublisher.broadcastEvent(ElectricReadingEvent(ctx.deviceType, ctx.alias, ctx.reading.toDouble(), ctx.delta.toDouble()))
                 ctx
                     .stream
-                    .filter { it.value > lastReading}
+                    .filter { it.value > lastReading || isFirstReading}
                     .map { reading ->
+                        isFirstReading = false
                         val delta = (reading.value - lastReading).toDouble()
                         logger.debug { "delta since last reading of ${ctx.alias} is $delta" }
                         lastReading = reading.value
-                        ReadingWithDelta(reading, delta, ctx.deviceType, ctx.meterId!!)
+                        ReadingWithDelta(reading, delta, ctx.deviceType)
                     }
             }
             .subscribe(this::processNewReading)
@@ -98,12 +94,10 @@ class ElectricPowerMonitoring(
         stream
             .filter { it is InstantReading }
             .groupBy { it.alias }
-            .flatMap {
+            .map {
                 logger.info { "configuring gauge for ${it.key()}" }
-                val storage = AtomicDouble()
-                eventPublisher
-                    .command(ReportingService.commandRequestGauge(it.key(), storage), it) { ctx, _ -> InstantContext(ctx.key(), storage, ctx) }
-                    .retryWhen(RetrySpec.fixedDelay(10L, Duration.ofSeconds(5L)))
+                val (_, storage, _) = meterService.createOrGetGauge(it.key(), Tags.empty()) { AtomicDouble() }
+                InstantContext(it.key(), storage, it)
             }
             .flatMap { ctx ->
                 logger.info { "gauge configured, starting to provide current readings for ${ctx.alias}..." }
@@ -123,39 +117,22 @@ class ElectricPowerMonitoring(
 
     private fun processNewReading(reading: ReadingWithDelta) {
         eventPublisher
-            .command(DeviceReadingHub.commandStoreReading(reading.deviceType, reading.value))
+            .command(DeviceReadingHub.commandStoreReading(reading.deviceType, reading.reading))
             .retryWhen(RetrySpec.fixedDelay(5, Duration.ofSeconds(1)))
             .subscribe(
                 { logger.debug { "stored ${reading.deviceType} reading with id = $it" } },
                 { err -> logger.warn { "failed to save reading ${reading.deviceType} - ${err.message} <${err.javaClass.name}>" } } )
 
-        eventPublisher
-            .command(ReportingService.commandUpdateCounter(reading.meterId, reading.delta))
-            .subscribe(
-                { logger.debug { "counter ${reading.meterId} updated" } },
-                { err -> logger.warn { "failed to update counter ${reading.meterId} - ${err.message} <${err.javaClass.name}>" } } )
+
+        eventPublisher.broadcastEvent(ElectricReadingEvent(reading.deviceType, reading.reading.alias, reading.reading.value.toDouble(), reading.delta))
     }
-
-
 
     private data class PersistenceContext(
         val alias: String,
         val deviceType: DeviceType,
         val reading: BigDecimal,
-        val stream: Flux<out ElectricReading>) {
-
-        var dailyDelta: BigDecimal? = null
-        var meterId: Meter.Id? = null
-
-        fun updateMeterId(id: Meter.Id): PersistenceContext {
-            meterId = id
-            return this
-        }
-        fun updateDailyDelta(delta: BigDecimal): PersistenceContext {
-            dailyDelta = delta
-            return this
-        }
-    }
+        val delta: BigDecimal,
+        val stream: Flux<out ElectricReading>)
 
     private data class InstantContext(
         val alias: String,
@@ -164,8 +141,13 @@ class ElectricPowerMonitoring(
     )
 
     private data class ReadingWithDelta(
-        val value: ElectricReading,
+        val reading: ElectricReading,
         val delta: Double,
-        val deviceType: DeviceType,
-        val meterId: Meter.Id)
+        val deviceType: DeviceType)
 }
+
+data class ElectricReadingEvent(
+    val deviceType: DeviceType,
+    val alias: String,
+    val value: Double,
+    val deltaSinceLastReading: Double)

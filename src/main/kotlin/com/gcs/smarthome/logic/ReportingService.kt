@@ -2,170 +2,186 @@ package com.gcs.smarthome.logic
 
 import com.gcs.smarthome.data.model.DeviceType
 import com.gcs.smarthome.data.repository.BusinessDayRepository
-import com.gcs.smarthome.logic.cqrs.GenericCommand
+import com.gcs.smarthome.logic.MeterService.Companion.tagTypeDailyValue
+import com.gcs.smarthome.logic.MeterService.Companion.tagTypeMonthlyValue
+import com.gcs.smarthome.logic.MeterService.Companion.tagTypeName
 import com.google.common.util.concurrent.AtomicDouble
-import io.micrometer.core.instrument.Counter
-import io.micrometer.core.instrument.Meter
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.Tags
+import io.micrometer.core.instrument.*
 import mu.KotlinLogging
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.atomic.AtomicReference
+import javax.annotation.PostConstruct
 
 @Service
 class ReportingService(
     private val businessDayRepository: BusinessDayRepository,
     private val cfg : ElectricPowerMonitoringConfig.ConfigurationResult,
-    private val meterRegistry: MeterRegistry) {
+    private val meterService: MeterService) {
 
     private val logger = KotlinLogging.logger {  }
     private val deviceTypes = listOf(
         DeviceType.POWER_METER_EXPORT.ordinal, DeviceType.POWER_METER_IMPORT.ordinal, DeviceType.POWER_METER_PRODUCTION.ordinal)
-    private val dailyDateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    private val meters: ConcurrentMap<Meter.Id, Any> = ConcurrentHashMap()
+
+    private val powerWarehouseReadingStorage = AtomicDouble(0.0)
+
+    private val totalElectricityImported = AtomicDouble(0.0)
+    private val totalElectricityExported = AtomicDouble(0.0)
+    private val electricityImportedSinceLastReading = AtomicDouble(0.0)
+    private val electricityExportedSinceLastReading = AtomicDouble(0.0)
+
+    private val importOffset = AtomicDouble(0.0)
+    private val exportOffset = AtomicDouble(0.0)
+
+    private val counters = ConcurrentHashMap<String, Counter>()
+    private val businessDay = AtomicReference<LocalDate>()
+
+    private val monthlyReportKey = AtomicReference<String>("")
+
+    private val readingUpdateEventMap = mapOf<DeviceType, (Double) -> Unit>(
+        DeviceType.POWER_METER_IMPORT to {
+            onRefreshGauges(
+                DeviceType.POWER_METER_IMPORT,
+                it,
+                importOffset,
+                totalElectricityImported,
+                electricityImportedSinceLastReading)
+         },
+        DeviceType.POWER_METER_EXPORT to {
+            onRefreshGauges(
+                DeviceType.POWER_METER_EXPORT,
+                it,
+                exportOffset,
+                totalElectricityExported,
+                electricityExportedSinceLastReading)
+        }
+    )
+
+    @PostConstruct
+    fun initialize() {
+        meterService.createOrGetGauge(POWER_STORAGE_READING, Tags.empty()) { powerWarehouseReadingStorage }
+        meterService.createOrGetGauge(TOTAL_ELECTRICITY_IMPORTED, Tags.empty()) { totalElectricityImported }
+        meterService.createOrGetGauge(TOTAL_ELECTRICITY_EXPORTED, Tags.empty()) { totalElectricityExported }
+        meterService.createOrGetGauge(ELECTRICITY_IMPORTED_SINCE_LAST_READING, Tags.empty()) { electricityImportedSinceLastReading }
+        meterService.createOrGetGauge(ELECTRICITY_EXPORTED_SINCE_LAST_READING, Tags.empty()) { electricityExportedSinceLastReading }
+    }
 
 
     @EventListener
     fun onBusinessDayStart(day: BusinessDayHub.BusinessDayOpenEvent) {
         logger.info { "initializing reporting service for $day" }
-        synchronized(meters) {
-            updateDailyCounters()
-        }
+        businessDay.set(day.date)
+
+        monthlyReportKey.set("${day.date.year}-${day.date.month}")
+
+        initializeDailyCounters()
+        initializeMonthlyCounters()
     }
 
     @EventListener
     fun onBusinessDayEnd(day: BusinessDayHub.BusinessDayCloseEvent) {
         logger.info { "closing business day for $day" }
-        synchronized(meters) {
-            val currentDayTag = tagForDailyMeter(day.date).first()
-            val toRemove = meters
-                .keys
-                .filter { it.type == Meter.Type.COUNTER }
-                .filter { it.tags.any { tag -> tag == currentDayTag } }
-                .toList()
-
-            internalRemoveMeters(toRemove)
-        }
+        counters.clear()
+        meterService.cleanupDailyMeters(day.date)
     }
 
     @EventListener(condition = "#args.isPowerReading()")
-    fun onNewElectricityReading(args: NewReferenceReading) {
+    fun onNewReferenceElectricityReading(args: NewReferenceReading) {
         logger.info { "got power reading $args" }
-        val (_, storage) = internalRequestGauge("last_power_storage_reading", AtomicDouble(), null)
-        storage.set(args.value.toDouble())
+        powerWarehouseReadingStorage.set(args.value.toDouble())
+        importOffset.set((args.importReadingValue ?: BigDecimal.ZERO).toDouble())
+        exportOffset.set((args.exportReadingValue ?: BigDecimal.ZERO).toDouble())
+
+        readingUpdateEventMap[DeviceType.POWER_METER_EXPORT]?.invoke(totalElectricityExported.get())
+        readingUpdateEventMap[DeviceType.POWER_METER_IMPORT]?.invoke(totalElectricityImported.get())
+
+        logger.info { "setting up initial storage settings for ${args.referenceType}: " +
+                "warehouse= ${powerWarehouseReadingStorage.get()}, " +
+                "importAtReadingTime= ${importOffset.get()}, " +
+                "exportAtReadingTime= ${exportOffset.get()}, " +
+                "totalExport= ${totalElectricityExported.get()}, " +
+                "totalImport= ${totalElectricityImported.get()}" }
     }
 
-    protected fun updateDailyCounters() {
+    @EventListener
+    fun onNewMeterReading(args: ElectricReadingEvent) {
+        readingUpdateEventMap[args.deviceType]?.invoke(args.value)
+
+        val dailyKey = "daily_${args.alias}"
+        val monthlyKey = "monthly_${args.alias}"
+        val dailyCounter = counters.computeIfAbsent(dailyKey) { key ->
+            val dailyCounter = meterService.withDayTag(businessDay.get()) {
+                meterService.createOrGetCounter(key, it.and(ImmutableTag(tagTypeName, tagTypeDailyValue)), 0.0)
+            }
+            logger.info { "created first counter $key for business day ${businessDay.get()}" }
+            dailyCounter.second
+        }
+        dailyCounter.increment(args.deltaSinceLastReading)
+        counters[monthlyKey]?.increment(args.deltaSinceLastReading)
+
+    }
+
+    private fun onRefreshGauges(deviceType: DeviceType, currentReading: Double, offset: AtomicDouble, total: AtomicDouble, adjusted: AtomicDouble) {
+        total.set(currentReading)
+        adjusted.set(currentReading - offset.get())
+        logger.debug { "updating totals for $deviceType - total: $currentReading, adjusted: ${adjusted.get()}" }
+    }
+
+    private fun initializeDailyCounters() {
         val report = businessDayRepository
             .loadDeviceDailyReport(deviceTypes)
             .groupBy { it.deviceType }
 
         logger.info { "updateDailyCounters triggered ${LocalDateTime.now()} - loaded report with ${report.keys} deviceTypes" }
+        val dailyTag = ImmutableTag(tagTypeName, tagTypeDailyValue)
 
-        val existingTags = meters
-            .keys
-            .filter { it.type == Meter.Type.COUNTER }
-            .toMutableList()
+        val dailyMeters = meterService.listMeterIdsBy(MeterService.filterByTag(dailyTag))
 
         report.forEach { (type, freshReports) ->
             cfg.metricsMapping[type]?.let { alias ->
                 freshReports.forEach { report ->
-                    val id = internalRequestCounter(alias, report.value.toDouble(), report.date, Tags.empty()).first
-                    existingTags.remove(id)
+                    val (id, _, _) = meterService.withDayTag(report.date) {
+                        meterService.createOrGetCounter("daily_$alias", it.and(dailyTag), report.value.toDouble())
+                    }
+                    dailyMeters.remove(id)
+                }
+            }
+        }
+        meterService.removeMeters(dailyMeters)
+    }
+
+    private fun initializeMonthlyCounters() {
+        val report = businessDayRepository
+            .loadDeviceMonthlyReport(deviceTypes)
+            .groupBy { it.deviceType }
+
+        val monthly = meterService.listMeterIdsBy(MeterService.filterByMonthlyTag())
+        meterService.removeMeters(monthly)
+        logger.info { "updateMonthlyCounters triggered ${LocalDateTime.now()} - loaded report with ${report.keys} deviceTypes" }
+        report.forEach { (deviceType, reports) ->
+
+            reports.forEach { report ->
+                val tags = Tags.of(ImmutableTag(tagTypeName, tagTypeMonthlyValue), ImmutableTag("date", "${report.year}-${report.month.format(2)}"))
+                val (id, counter, _ ) = meterService.createOrGetCounter("monthly_${cfg.metricsMapping[deviceType]}", tags, report.value.toDouble())
+                if (report.year == businessDay.get().year && report.month == businessDay.get().monthValue) {
+                    counters[id.name] = counter
                 }
             }
         }
 
-        internalRemoveMeters(existingTags)
-
-    }
-
-    private interface EventInvoker<TPayload, TResult> {
-        fun applyEvent(callback: (TPayload) -> TResult)
-    }
-
-    @EventListener
-    fun onHandleRequestCounterCommand(cmd: RequestCounterCommand) {
-        cmd.applyEvent { internalRequestCounter(it.first, it.second, LocalDate.now(), Tags.empty()).first }
-    }
-
-    @EventListener
-    fun onHandleRequestGaugeCommand(cmd: RequestGaugeCommand) {
-        cmd.applyEvent { internalRequestGauge(it.first, it.second, null, it.third).first }
-    }
-
-    @EventListener
-    fun onHandleUpdateCounterCommand(cmd: UpdateCounterCommand) {
-        cmd.applyEvent {
-            meters.computeIfPresent(it.first) { id, counter ->
-                counter as Counter
-                counter.increment(it.second)
-                logger.debug { "counter $id incremented by ${it.second}" }
-                counter
-            }
-        }
-    }
-
-    private fun internalRequestGauge(name: String, storage: AtomicDouble, date: LocalDate?, providedTags: Tags = Tags.empty()): Pair<Meter.Id, AtomicDouble> {
-        val tags = (date?.let { tagForDailyMeter(it) } ?: Tags.empty()).and(providedTags)
-
-        val key = Meter.Id(name, tags, null, null, Meter.Type.GAUGE)
-        val boundStorage = meters.computeIfAbsent(key) { id ->
-            val gauge = meterRegistry.gauge(id.name, id.tags, storage) { storage.get() }
-            logger.info { "request to create gauge $id completed" }
-            gauge
-        }
-        return Pair(key, boundStorage as AtomicDouble)
-    }
-
-    private fun internalRequestCounter(name: String, reading: Double, date: LocalDate?, providedTags: Tags): Pair<Meter.Id, Counter> {
-        val tags = (date?.let { tagForDailyMeter(it) } ?: Tags.empty()).and(providedTags)
-
-        val key = Meter.Id(name, tags, null, null, Meter.Type.COUNTER)
-        val counter = meters.computeIfAbsent(key) { id ->
-            val counter = meterRegistry.counter(id.name, id.tags)
-            counter.increment(reading)
-            logger.info { "request to create counter $id with initial value of $reading completed" }
-            counter
-        }
-        return Pair(key, counter as Counter)
-    }
-
-    private fun internalRemoveMeters(meterIds: Collection<Meter.Id>) {
-        meterIds.forEach {
-            logger.info { "removing meter $it" }
-            meters.remove(it)
-            meterRegistry.remove(it)
-        }
-    }
-
-    private fun tagForDailyMeter(date: LocalDate) =
-        Tags.of("date", date.format(dailyDateFormat))
-
-    class RequestCounterCommand(counterName: String, initialReading: Double) :
-        GenericCommand<Pair<String, Double>, Meter.Id>(Pair(counterName, initialReading)), EventInvoker<Pair<String, Double>, Meter.Id> {
-
-        override fun applyEvent(callback: (Pair<String, Double>) -> Meter.Id) = execute(callback)
-    }
-
-    class UpdateCounterCommand(counterId: Meter.Id, delta: Double) :
-        GenericCommand<Pair<Meter.Id, Double>, Unit>(Pair(counterId, delta)), EventInvoker<Pair<Meter.Id, Double>, Unit> {
-        override fun applyEvent(callback: (Pair<Meter.Id, Double>) -> Unit) = execute(callback)
-    }
-
-    class RequestGaugeCommand(gaugeName: String, storage: AtomicDouble, tags: Tags) :
-        GenericCommand<Triple<String, AtomicDouble, Tags>, Meter.Id>(Triple(gaugeName, storage, tags)), EventInvoker<Triple<String, AtomicDouble, Tags>, Meter.Id> {
-        override fun applyEvent(callback: (Triple<String, AtomicDouble, Tags>) -> Meter.Id) = execute(callback)
     }
 
     companion object {
-        fun commandRequestCounter(counterName: String, initialReading: Double) = RequestCounterCommand(counterName, initialReading)
-        fun commandUpdateCounter(id: Meter.Id, delta: Double) = UpdateCounterCommand(id, delta)
-        fun commandRequestGauge(gaugeName: String, storage: AtomicDouble, tags: Tags = Tags.empty()) = RequestGaugeCommand(gaugeName, storage, tags)
+        const val POWER_STORAGE_READING = "last_power_storage_reading"
+        const val TOTAL_ELECTRICITY_IMPORTED = "total_electricity_imported"
+        const val TOTAL_ELECTRICITY_EXPORTED = "total_electricity_exported"
+        const val ELECTRICITY_IMPORTED_SINCE_LAST_READING = "electricity_imported_since_last_reading"
+        const val ELECTRICITY_EXPORTED_SINCE_LAST_READING = "electricity_exported_since_last_reading"
     }
+
+    fun Number.format(pad: Int): String = "%0${pad}d".format(this)
 }

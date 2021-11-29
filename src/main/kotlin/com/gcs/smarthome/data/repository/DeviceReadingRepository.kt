@@ -1,7 +1,6 @@
 package com.gcs.smarthome.data.repository
 
 import com.gcs.smarthome.data.model.DeviceReading
-import com.gcs.smarthome.data.model.DeviceReadingDailyReport
 import com.gcs.smarthome.data.model.DeviceType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
