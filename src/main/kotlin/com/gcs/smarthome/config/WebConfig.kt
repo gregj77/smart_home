@@ -4,7 +4,6 @@ import com.google.common.util.concurrent.AtomicDouble
 import io.micrometer.core.instrument.MeterRegistry
 import mu.KotlinLogging
 import org.springframework.context.annotation.Bean
-import org.springframework.http.HttpHeaders.AUTHORIZATION
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authorization.AuthorizationDecision
 import org.springframework.security.authorization.ReactiveAuthorizationManager
@@ -42,7 +41,7 @@ class WebConfig(meterRegistry: MeterRegistry) {
     private fun accessChecker(): ReactiveAuthorizationManager<AuthorizationContext> {
         return ReactiveAuthorizationManager<AuthorizationContext> { _, ctx ->
             val currentToken = tokenValue.get().toLong().toString()
-            val providedToken = ctx.exchange.request.headers.getFirst(AUTHORIZATION)
+            val providedToken = ctx.exchange.request.headers.getFirst("X-Access-Token")
             val result = currentToken == providedToken
             logger.info { "provided: $providedToken, expected: $currentToken, decision: $result" }
             Mono.just(AuthorizationDecision(result))
