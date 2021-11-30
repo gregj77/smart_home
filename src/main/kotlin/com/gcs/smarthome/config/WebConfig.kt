@@ -41,7 +41,7 @@ class WebConfig(meterRegistry: MeterRegistry) {
     private fun accessChecker(): ReactiveAuthorizationManager<AuthorizationContext> {
         return ReactiveAuthorizationManager<AuthorizationContext> { _, ctx ->
             val currentToken = tokenValue.get().toLong().toString()
-            val providedToken = ctx.exchange.request.headers.getFirst("X-Access-Token")
+            val providedToken = ctx.exchange.request.headers["X-Access-Token"]?.firstOrNull()
             val result = currentToken == providedToken
             logger.info { "provided: $providedToken, expected: $currentToken, decision: $result" }
             Mono.just(AuthorizationDecision(result))
