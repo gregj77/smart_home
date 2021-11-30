@@ -19,11 +19,11 @@ import kotlin.random.Random
 @EnableWebFluxSecurity
 class WebConfig(meterRegistry: MeterRegistry) {
 
-    private val tokenValue = AtomicDouble(nextTokenValue().toDouble())
+    private val tokenValue: AtomicDouble
     private val logger = KotlinLogging.logger {  }
 
     init {
-        meterRegistry.gauge("access_token", tokenValue) { tokenValue.get() }
+        tokenValue = meterRegistry.gauge("access_token", AtomicDouble(nextTokenValue().toDouble()))!!
     }
 
     @Bean
