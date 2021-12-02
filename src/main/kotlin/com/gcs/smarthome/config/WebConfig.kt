@@ -54,5 +54,5 @@ class WebConfig(meterRegistry: MeterRegistry) {
     }
 
     private fun nextTokenValue() = Random(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC))
-        .nextLong(Integer.MAX_VALUE.toLong(), Long.MAX_VALUE)
+        .nextLong(Integer.MAX_VALUE.toLong(), 68_719_476_735L)
 }
