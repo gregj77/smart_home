@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
 import java.time.Duration
 import java.time.LocalDate
+import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
 
 @Service
@@ -48,13 +49,17 @@ class BusinessDayHub (private val repository: BusinessDayRepository,
             .map { smartHomeTaskScheduler.time.toSecondOfDay().toDouble() }
             .subscribe { storage.set(it) }
 
-        subscriptions += smartHomeTaskScheduler
+        val startDayStream = smartHomeTaskScheduler
             .schedule("1 0 0 * * *", LocalDate::class, true)
-            .subscribe(this::initNewBusinessDay)
+            .map(this::initNewBusinessDay)
 
-        subscriptions += smartHomeTaskScheduler
+        val endDayStream = smartHomeTaskScheduler
             .schedule("59 59 23 * * *", LocalDate::class)
-            .subscribe(this::closeBusinessDay)
+            .map(this::closeBusinessDay)
+
+        subscriptions += Flux
+            .merge(startDayStream, endDayStream)
+            .subscribe(eventPublisher::broadcastEvent)
 
         tokens.addAll(subscriptions)
     }
@@ -64,16 +69,16 @@ class BusinessDayHub (private val repository: BusinessDayRepository,
         tokens.dispose()
     }
 
-    private fun initNewBusinessDay(currentDay: LocalDate) {
+    private fun initNewBusinessDay(currentDay: LocalDate): Any {
         val (id, date) = createOrGetCurrentBusinessDay(currentDay)
         logger.info { "broadcasting business day information for $date} = $id" }
-        eventPublisher.broadcastEvent(BusinessDayOpenEvent(id, date))
+        return BusinessDayOpenEvent(id, date)
     }
 
-    private fun closeBusinessDay(currentDay: LocalDate) {
+    private fun closeBusinessDay(currentDay: LocalDate): Any {
         val (id, date) = createOrGetCurrentBusinessDay(currentDay)
         logger.info { "broadcasting close of business day information for $date} = $id" }
-        eventPublisher.broadcastEvent(BusinessDayCloseEvent(id, date))
+        return BusinessDayCloseEvent(id, date)
     }
 
     private fun createOrGetCurrentBusinessDay(currentDay: LocalDate): Pair<Short, LocalDate> {
