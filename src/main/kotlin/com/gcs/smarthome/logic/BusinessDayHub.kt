@@ -18,52 +18,69 @@ import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
 import java.time.Duration
 import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
 import javax.annotation.PreDestroy
 
 @Service
 class BusinessDayHub (private val repository: BusinessDayRepository,
                       private val eventPublisher: EventPublisher,
                       private val meterService: MeterService,
-                      private val txManager: PlatformTransactionManager) {
+                      private val txManager: PlatformTransactionManager,
+                      private val smartHomeTaskScheduler: SmartHomeTaskScheduler) {
+
     private val logger = KotlinLogging.logger {  }
-    private var token: Disposable = Disposables.disposed()
+    private val tokens: Disposable.Composite = Disposables.composite()
+    private val secondsInDay = AtomicDouble()
+
+    val secondsSinceDayStart: Long
+        get() = secondsInDay.toLong()
 
     @EventListener(classes = [ApplicationReadyEvent::class])
     fun initialize() {
-        initNewBusinessDay()
-        val (_, storage, _) = meterService.createOrGetGauge(BUSINESS_DAY_UP_GAUGE, Tags.empty()) { AtomicDouble(LocalTime.now(ZoneId.systemDefault()).toSecondOfDay().toDouble()) }
-        token = Flux
+
+        secondsInDay.set(smartHomeTaskScheduler.time.toSecondOfDay().toDouble())
+
+        val (_, storage, _) = meterService.createOrGetGauge(BUSINESS_DAY_UP_GAUGE, Tags.empty()) { secondsInDay }
+
+        val subscriptions = mutableListOf<Disposable>()
+
+        subscriptions += Flux
             .interval(Duration.ofSeconds(0), Duration.ofSeconds(5L), Schedulers.parallel())
-            .map { LocalTime.now(ZoneId.systemDefault()).toSecondOfDay().toDouble() }
+            .map { smartHomeTaskScheduler.time.toSecondOfDay().toDouble() }
             .subscribe { storage.set(it) }
+
+        subscriptions += smartHomeTaskScheduler
+            .schedule("1 0 0 * * *", LocalDate::class, true)
+            .subscribe(this::initNewBusinessDay)
+
+        subscriptions += smartHomeTaskScheduler
+            .schedule("59 59 23 * * *", LocalDate::class)
+            .subscribe(this::closeBusinessDay)
+
+        tokens.addAll(subscriptions)
     }
 
     @PreDestroy
     fun destroy() {
-        token.dispose()
+        tokens.dispose()
     }
 
-    @Scheduled(cron = "1 0 0 * * *")
-    protected fun initNewBusinessDay() {
-        val (id, date) = createOrGetCurrentBusinessDay()
+    private fun initNewBusinessDay(currentDay: LocalDate) {
+        val (id, date) = createOrGetCurrentBusinessDay(currentDay)
         logger.info { "broadcasting business day information for $date} = $id" }
         eventPublisher.broadcastEvent(BusinessDayOpenEvent(id, date))
     }
 
-    @Scheduled(cron = "59 59 23 * * *")
-    protected fun closeBusinessDay() {
-        val (id, date) = createOrGetCurrentBusinessDay()
+    private fun closeBusinessDay(currentDay: LocalDate) {
+        val (id, date) = createOrGetCurrentBusinessDay(currentDay)
         logger.info { "broadcasting close of business day information for $date} = $id" }
         eventPublisher.broadcastEvent(BusinessDayCloseEvent(id, date))
     }
 
-    private fun createOrGetCurrentBusinessDay(): Pair<Short, LocalDate> {
+    private fun createOrGetCurrentBusinessDay(currentDay: LocalDate): Pair<Short, LocalDate> {
         txManager.getTransaction(TransactionDefinition.withDefaults()).let {
-            val businessDay = repository.findFirstByReferenceEquals(LocalDate.now())
+            val businessDay = repository.findFirstByReferenceEquals(currentDay)
             val result = if (businessDay.isEmpty) {
-                val newBusinessDay = BusinessDay(LocalDate.now())
+                val newBusinessDay = BusinessDay(currentDay)
                 logger.info { "no business day found for ${newBusinessDay.reference} - creating new one..." }
                 repository.save(newBusinessDay)
             } else {

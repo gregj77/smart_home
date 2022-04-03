@@ -26,6 +26,6 @@ class EventingConfiguration {
 
     @Bean
     fun eventPublisher(publisher: ApplicationEventPublisher): EventPublisher {
-        return EventPublisher(publisher, Duration.ofSeconds(5L))
+        return EventPublisher(publisher, Duration.ofSeconds(60L))
     }
 }
