@@ -14,6 +14,7 @@ import java.time.Duration
 class EventingConfiguration {
     private val logger = KotlinLogging.logger {  }
 
+
     @Bean
     fun asyncApplicationEventMulticaster(): ApplicationEventMulticaster {
         val eventMulticaster = SimpleApplicationEventMulticaster()
@@ -26,6 +27,7 @@ class EventingConfiguration {
 
     @Bean
     fun eventPublisher(publisher: ApplicationEventPublisher): EventPublisher {
-        return EventPublisher(publisher, Duration.ofSeconds(5L))
+        return EventPublisher(publisher, Duration.ofSeconds(60L))
     }
+
 }

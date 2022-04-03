@@ -3,26 +3,20 @@ package com.gcs.smarthome.logic
 import com.gcs.gRPCModbusAdapter.service.*
 import com.gcs.smarthome.config.MonitoringConfiguration
 import com.gcs.smarthome.data.model.DeviceType
-import io.grpc.stub.StreamObserver
 import mu.KotlinLogging
-import net.devh.boot.grpc.client.inject.GrpcClient
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import reactor.core.publisher.Flux
-import reactor.util.retry.RetrySpec
 import java.lang.reflect.Constructor
-import java.time.Duration
+import java.time.ZoneId
 
 @Configuration
 class ElectricPowerMonitoringConfig(private val monitoringConfiguration: MonitoringConfiguration) {
 
     private val logger = KotlinLogging.logger {  }
 
-    @GrpcClient("modbusServiceAdapter")
-    private lateinit var service: ModbusDeviceServiceGrpc.ModbusDeviceServiceStub
-
     @Bean
-    protected fun processConfiguration(): ConfigurationResult {
+    protected fun processConfiguration(zoneId: ZoneId): ConfigurationResult {
         val queryBuilder = Query.newBuilder()
 
         val mapping = mutableMapOf<Pair<String, DeviceFunction>, (Response) -> ElectricReading>()
@@ -47,10 +41,10 @@ class ElectricPowerMonitoringConfig(private val monitoringConfiguration: Monitor
                         requestBuilder.readIntervalInSeconds = function.readInterval
                         deviceRequestBuilder.addReadRequests(requestBuilder.build())
 
-                        val ctor = function.readingType.constructors[0] as Constructor<ElectricReading>
+                        val ctor = @Suppress("UNCHECKED_CAST")(function.readingType.constructors[0] as Constructor<ElectricReading>)
                         val aliasForMetricsRegistry = function.alias.lowercase().replace(Regex("\\s+"), "_")
                         mapping[Pair(device.deviceName, function.functionName)] = { response ->
-                            ElectricReading.fromResponse(aliasForMetricsRegistry, response, ctor)
+                            ElectricReading.fromResponse(aliasForMetricsRegistry, response, ctor, zoneId)
                         }
 
                         if (ElectricReading.classToDeviceMapping.containsKey(function.readingType.kotlin)) {
@@ -68,36 +62,16 @@ class ElectricPowerMonitoringConfig(private val monitoringConfiguration: Monitor
     }
 
     @Bean
-    protected fun createMeterDataStream(cfg: ConfigurationResult): Flux<ElectricReading> {
+    protected fun createMeterDataStream(cfg: ConfigurationResult, queryBuilder: (Query) -> Flux<Response>): Flux<ElectricReading> {
         if (!cfg.isValid) {
             logger.warn { "ElectricMonitoring configuration is invalid - either grpc.client.modbusServiceAdapter or monitoring.electricityDevices is missing!" }
             return Flux.never()
         }
-        return Flux
-            .create<ElectricReading> { sink ->
-                val observer = object : StreamObserver<Response> {
-                    override fun onNext(item: Response) {
-                        val key = Pair(item.deviceName, item.functionName)
-                        cfg.mapping[key]?.let {
-                            sink.next(it(item))
-                        }
-                    }
-
-                    override fun onError(error: Throwable) = sink.error(error)
-                    override fun onCompleted() = sink.complete()
-                }
-
-                try {
-                    logger.info { "subscribing data stream...." }
-                    service.subscribeForDeviceData(cfg.query, observer)
-                    logger.info { "subscribed!" }
-                } catch (err: Exception) {
-                    logger.warn { "failed to subscribe data stream: ${err.message} <${err.javaClass.name}>\n${err.stackTrace}" }
-                    sink.error(err)
-                }
+        return queryBuilder(cfg.query)
+            .mapNotNull { reading ->
+                val key = Pair(reading.deviceName, reading.functionName)
+                cfg.mapping[key]?.let { mappingFunc -> mappingFunc(reading) }
             }
-            .doOnError{ logger.error { "failed to create stream - ${it.message} <${it.javaClass.name}>\n${it.stackTrace}" }}
-            .retryWhen(RetrySpec.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(5L)))
             .publish()
             .refCount()
     }

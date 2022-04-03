@@ -5,6 +5,7 @@ import java.time.LocalDate
 
 interface DeviceReadingDailyReport {
     val value: BigDecimal
+    val dailyDelta: BigDecimal
     val deviceType: DeviceType
     val date: LocalDate
 }

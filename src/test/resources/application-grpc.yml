@@ -1,0 +1,42 @@
+monitoring:
+  electricityDevices:
+    - deviceName: ProductionMeter
+      functions:
+        - functionName: EXPORT_POWER
+          readInterval: 1
+          alias: "Production_TotalPower_1"
+          readingType: com.gcs.smarthome.logic.ElectricReading.ProducedPower
+        - functionName: EXPORT_POWER
+          readInterval: 2
+          alias: "Production_ImportPower_2"
+          readingType: com.gcs.smarthome.logic.ElectricReading.ImportedPower
+        - functionName: CURRENT_POWER
+          readInterval: 3
+          alias: "Production_CurrentPower_3"
+          readingType: com.gcs.smarthome.logic.ElectricReading.InstantProductionPower
+        - functionName: CURRENT_VOLTAGE_PHASE1
+          readInterval: 4
+          alias: "Voltage_Phase_1"
+          readingType: com.gcs.smarthome.logic.ElectricReading.CurrentVoltage
+        - functionName: CURRENT_VOLTAGE_PHASE2
+          readInterval: 4
+          alias: "Voltage_Phase_2"
+          readingType: com.gcs.smarthome.logic.ElectricReading.CurrentVoltage
+        - functionName: CURRENT_VOLTAGE_PHASE3
+          readInterval: 4
+          alias: "Voltage_Phase_3"
+          readingType: com.gcs.smarthome.logic.ElectricReading.CurrentVoltage
+    - deviceName: MainMeter
+      functions:
+        - functionName: CURRENT_POWER
+          readInterval: 12
+          alias: "Main_Current_01"
+          readingType: com.gcs.smarthome.logic.ElectricReading.InstantTotalPower
+        - functionName: IMPORT_POWER
+          readInterval: 13
+          alias: "Main_Import_02"
+          readingType: com.gcs.smarthome.logic.ElectricReading.ImportedPower
+        - functionName: EXPORT_POWER
+          readInterval: 14
+          alias: "Main_Export_03"
+          readingType: com.gcs.smarthome.logic.ElectricReading.ExportedPower

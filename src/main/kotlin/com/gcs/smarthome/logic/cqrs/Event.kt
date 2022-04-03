@@ -13,12 +13,12 @@ abstract class Event<TPayload, TResult>(private val payload: TPayload) {
         task.completeExceptionally(error)
     }
 
-    protected fun execute( handler: (TPayload) -> TResult) {
+    fun handle( handler: (TPayload) -> TResult) {
         try {
             complete(handler(payload))
         } catch (err: Exception) {
             fail(err)
         }
     }
-
 }
+

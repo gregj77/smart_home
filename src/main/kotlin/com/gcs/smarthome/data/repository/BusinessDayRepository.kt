@@ -15,7 +15,7 @@ import java.util.*
 interface BusinessDayRepository : JpaRepository<BusinessDay, Short> {
     fun findFirstByReferenceEquals(now: LocalDate = LocalDate.now()) : Optional<BusinessDay>
 
-    @Query("SELECT (MAX(value) - MIN(value)) AS VALUE, device_type as deviceType, bd.reference AS date " +
+    @Query("SELECT MAX(value) AS VALUE, (MAX(value) - MIN(value)) AS dailyDelta, device_type as deviceType, bd.reference AS date " +
             "FROM device_reading dr JOIN business_day bd ON dr.business_day_id = bd.id " +
             "WHERE bd.reference BETWEEN :start AND :end " +
             "AND dr.device_type IN (:types) " +
@@ -34,6 +34,7 @@ interface BusinessDayRepository : JpaRepository<BusinessDay, Short> {
             "                  (\n" +
             "                      SELECT MIN(reference) AS range_start, MAX(reference) AS range_end, year_and_month\n" +
             "                      FROM business_day\n" +
+            "                      WHERE (:yearAndMonth IS NOT NULL AND year_and_month = :yearAndMonth) OR (:yearAndMonth IS NULL)\n" +
             "                      GROUP BY year_and_month\n" +
             "                  ) AS rng\n" +
             "             WHERE rs.reference = rng.range_start\n" +
@@ -46,5 +47,5 @@ interface BusinessDayRepository : JpaRepository<BusinessDay, Short> {
             "GROUP BY year_and_month, device_type\n" +
             "ORDER BY year_and_month desc, device_type", nativeQuery = true)
     fun loadDeviceMonthlyReport(
-        @Param("types") types: Collection<Int>): List<DeviceReadingMonthlyReport>
+        @Param("types") types: Collection<Int>, @Param("yearAndMonth") yearAndMonth: Int?): List<DeviceReadingMonthlyReport>
 }

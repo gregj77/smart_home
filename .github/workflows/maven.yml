@@ -28,14 +28,13 @@ jobs:
         run: mvn -B versions:set -DnewVersion=1.0.$GITHUB_RUN_NUMBER-SNAPSHOT
 
       - name: Build with Maven
-        run: mvn -B package verify
+        run: mvn -B package verify sonar:sonar --file pom.xml -Dsonar.projectKey=gregj77_smart_home -Dsonar.organization=gregj77 -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=$SONAR_TOKEN -Dsonar.coverage.jacoco.xmlReportPaths=./target/site/jacoco/jacoco.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           REPOSITORY_TOKEN: ${{ secrets.REPOSITORY_TOKEN }}
 
       - name: Log-in to docker repository
-        if: github.ref == 'refs/heads/main'
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USER }}
@@ -45,3 +44,6 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: mvn -B docker:build docker:push
 
+      - name: Generate docker image on pull request
+        if: github.event_name == 'pull_request'
+        run: mvn -B docker:build docker:push

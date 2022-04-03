@@ -10,9 +10,18 @@ import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.reflect.KClass
 
+interface InstantReading
+
+internal interface PersistableReading {
+    val deviceType: DeviceType
+}
+
 sealed class ElectricReading(val value: BigDecimal, val unit: String, val time: LocalDateTime, val alias: String) {
 
     val id = counter.incrementAndGet()
+
+    val formattedReading: String
+        get() = "$value $unit"
 
     class ExportedPower(value: BigDecimal, unit: String, time: LocalDateTime, alias: String)
         : ElectricReading(value, unit, time, alias), PersistableReading {
@@ -36,6 +45,9 @@ sealed class ElectricReading(val value: BigDecimal, val unit: String, val time: 
     class InstantTotalPower(value: BigDecimal, unit: String, time: LocalDateTime, alias: String)
         : ElectricReading(value, unit, time, alias), InstantReading
 
+    class CurrentVoltage(value: BigDecimal, unit: String, time: LocalDateTime, alias: String)
+        : ElectricReading(value, unit, time, alias), InstantReading
+
     companion object {
         private val counter = AtomicLong(0)
 
@@ -45,10 +57,10 @@ sealed class ElectricReading(val value: BigDecimal, val unit: String, val time: 
             ProducedPower::class to DeviceType.POWER_METER_PRODUCTION
         )
 
-        fun fromResponse(alias: String, response: Response, target: Constructor<ElectricReading>) : ElectricReading {
+        fun fromResponse(alias: String, response: Response, target: Constructor<ElectricReading>, zoneId: ZoneId) : ElectricReading {
             val readingValue = response.value.toFloat().toBigDecimal()
             val readingTime = Instant.ofEpochSecond(response.time.seconds, response.time.nanos.toLong())
-                .atZone(ZoneId.systemDefault())
+                .atZone(zoneId)
                 .toLocalDateTime()
 
             return target.newInstance(readingValue, response.unit, readingTime, alias)
