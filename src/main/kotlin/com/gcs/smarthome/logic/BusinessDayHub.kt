@@ -8,17 +8,14 @@ import io.micrometer.core.instrument.Tags
 import mu.KotlinLogging
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.context.event.EventListener
-import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.TransactionDefinition
 import reactor.core.Disposable
 import reactor.core.Disposables
 import reactor.core.publisher.Flux
-import reactor.core.scheduler.Schedulers
-import java.time.Duration
 import java.time.LocalDate
-import javax.annotation.PostConstruct
+import java.time.LocalTime
 import javax.annotation.PreDestroy
 
 @Service
@@ -38,16 +35,14 @@ class BusinessDayHub (private val repository: BusinessDayRepository,
     @EventListener(classes = [ApplicationReadyEvent::class])
     fun initialize() {
 
-        secondsInDay.set(smartHomeTaskScheduler.time.toSecondOfDay().toDouble())
-
         val (_, storage, _) = meterService.createOrGetGauge(BUSINESS_DAY_UP_GAUGE, Tags.empty()) { secondsInDay }
 
         val subscriptions = mutableListOf<Disposable>()
 
-        subscriptions += Flux
-            .interval(Duration.ofSeconds(0), Duration.ofSeconds(5L), Schedulers.parallel())
-            .map { smartHomeTaskScheduler.time.toSecondOfDay().toDouble() }
-            .subscribe { storage.set(it) }
+        subscriptions += smartHomeTaskScheduler
+            .schedule("0/5 * * * * *", LocalTime::class, true)
+            .map { it.toSecondOfDay().toDouble() }
+            .subscribe(storage::set)
 
         val startDayStream = smartHomeTaskScheduler
             .schedule("1 0 0 * * *", LocalDate::class, true)

@@ -28,6 +28,7 @@ import org.springframework.transaction.PlatformTransactionManager
 import reactor.test.scheduler.VirtualTimeScheduler
 import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -35,6 +36,9 @@ import java.util.*
 @ExtendWith(SpringExtension::class)
 @ContextConfiguration(classes = [BusinessDayHubTest.ScopedConfig::class])
 class BusinessDayHubTest  {
+
+    @Autowired
+    lateinit var victim: BusinessDayHub
 
     @MockkBean
     lateinit var repository: BusinessDayRepository
@@ -75,6 +79,8 @@ class BusinessDayHubTest  {
         val event = mockk<ApplicationReadyEvent>(relaxed = true)
         eventPublisher.publishEvent(event)
 
+        assertThat(victim.secondsSinceDayStart).isEqualTo(LocalTime.of(13, 0, 0).toSecondOfDay().toLong())
+
         // advance time to current business day is closed, new one is created and completed
         timeScheduler.advanceTimeBy(
             Duration
@@ -107,6 +113,8 @@ class BusinessDayHubTest  {
             .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayHub.BusinessDayCloseEvent::class.java))
             .extracting(BusinessDayHub.BusinessDayCloseEvent::date)
             .isEqualTo(LocalDate.of(2022, 1, 2))
+
+        assertThat(victim.secondsSinceDayStart).isEqualTo(LocalTime.of(23, 59, 55).toSecondOfDay().toLong())
 
         verify(exactly = 2) {
             hint(BusinessDay::class)
