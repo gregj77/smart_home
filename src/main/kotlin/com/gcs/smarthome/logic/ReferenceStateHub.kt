@@ -101,7 +101,7 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
     }
 
     class StoreLatestReferenceCommand(reading: Reading) : GenericCommand<Reading, Int>(reading), EventInvoker<Reading, Int> {
-        override fun applyEvent(callback: (Reading) -> Int) = execute(callback)
+        override fun applyEvent(callback: (Reading) -> Int) = handle(callback)
     }
 
     companion object {

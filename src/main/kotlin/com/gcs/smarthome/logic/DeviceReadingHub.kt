@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.transaction.Transactional
 
 @Service
-class DeviceReadingHub(private val repository: DeviceReadingRepository) {
+class DeviceReadingHub(private val repository: DeviceReadingRepository)  {
 
     private val logger = KotlinLogging.logger {  }
     private val businessDay: AtomicReference<Short> = AtomicReference(-1)
@@ -26,7 +26,8 @@ class DeviceReadingHub(private val repository: DeviceReadingRepository) {
 
     @EventListener
     fun handleLatestDeviceReadingQuery(event: LatestDeviceReadingQuery) {
-        event.applyEvent {
+
+        event.handle {
             val reading = repository
                 .findFirstByDeviceTypeOrderByIdDesc(it)
                 .map { rec -> rec.value }
@@ -39,7 +40,7 @@ class DeviceReadingHub(private val repository: DeviceReadingRepository) {
 
     @EventListener
     fun handleDailyDeltaDeviceReadingQuery(event: DailyDeltaDeviceReadingQuery) {
-        event.applyEvent {
+        event.handle {
             val reading = repository.getDailyReadingDelta(it.first, it.second.toShort()) ?: BigDecimal.ZERO
             logger.debug { "device reading delta for ${it.first} = $reading" }
             reading
@@ -49,7 +50,8 @@ class DeviceReadingHub(private val repository: DeviceReadingRepository) {
     @EventListener
     @Transactional
     fun handleStoreLatestReading(cmd: StoreLatestReadingCommand) {
-        cmd.applyEvent {
+
+        cmd.handle {
             if (businessDay.get() > 0) {
                 repository.save(DeviceReading(it.first, it.second.value, it.second.time.toLocalTime(), businessDay.get())).id
             } else {
@@ -58,25 +60,11 @@ class DeviceReadingHub(private val repository: DeviceReadingRepository) {
         }
     }
 
-    class LatestDeviceReadingQuery(payload: DeviceType) : GenericQuery<DeviceType, BigDecimal>(payload), EventInvoker<DeviceType, BigDecimal> {
-        override fun applyEvent(callback: (DeviceType) -> BigDecimal) = execute(callback)
-    }
+    class LatestDeviceReadingQuery(payload: DeviceType) : GenericQuery<DeviceType, BigDecimal>(payload)
 
-    class DailyDeltaDeviceReadingQuery(deviceType: DeviceType, businessDay: Int) : GenericQuery<Pair<DeviceType, Int>, BigDecimal>(
-        Pair(deviceType, businessDay)
-    ), EventInvoker<Pair<DeviceType, Int>, BigDecimal> {
-        override fun applyEvent(callback: (Pair<DeviceType, Int>) -> BigDecimal) = execute(callback)
-    }
+    class DailyDeltaDeviceReadingQuery(deviceType: DeviceType, businessDay: Int) : GenericQuery<Pair<DeviceType, Int>, BigDecimal>(Pair(deviceType, businessDay))
 
-    class StoreLatestReadingCommand(deviceType: DeviceType, reading: ElectricReading) : GenericCommand<Pair<DeviceType, ElectricReading>, Int>(
-        Pair(deviceType, reading)
-    ), EventInvoker<Pair<DeviceType, ElectricReading>, Int> {
-        override fun applyEvent(callback: (Pair<DeviceType,ElectricReading>) -> Int) = execute(callback)
-    }
-
-    private interface EventInvoker<TPayload, TResult> {
-        fun applyEvent(callback: (TPayload) -> TResult)
-    }
+    class StoreLatestReadingCommand(deviceType: DeviceType, reading: ElectricReading) : GenericCommand<Pair<DeviceType, ElectricReading>, Int>(Pair(deviceType, reading))
 
     companion object {
         fun queryLatestDeviceReading(deviceType: DeviceType) = LatestDeviceReadingQuery(deviceType)

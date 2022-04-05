@@ -21,7 +21,7 @@ class EventPublisher(private val publisher: ApplicationEventPublisher, private v
     }
 
     fun <Payload, Result, T : GenericQuery<Payload, Result>> query(args: T) =
-        query(args, "") { _, result -> result }
+        query(args, Unit) { _, result -> result }
 
     fun <Payload, Result, T : GenericCommand<Payload, Result>, CTX, AggregatedResult> command(
         args: T,
@@ -33,7 +33,7 @@ class EventPublisher(private val publisher: ApplicationEventPublisher, private v
     }
 
     fun <Payload, Result, T : GenericCommand<Payload, Result>> command(args: T) =
-        command(args, "") { _, result -> result }
+        command(args, Unit) { _, result -> result }
 
     private fun <Result> internalHandleResult(asyncStage: CompletableFuture<Result>) = Mono
         .fromFuture(asyncStage)
