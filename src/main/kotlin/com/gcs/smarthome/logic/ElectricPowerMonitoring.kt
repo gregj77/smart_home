@@ -34,8 +34,8 @@ class ElectricPowerMonitoring(
     @EventListener
     fun onNewBusinessDay(day: BusinessDayHub.BusinessDayOpenEvent) {
         logger.info { "business day starting $day" }
-        persistableReadingToken.update(initializePersistableDataStream(dataStream))
         businessDay.set(day.businessDayId.toInt())
+        persistableReadingToken.update(initializePersistableDataStream(dataStream))
         if (!isInitialized.get()) {
             isInitialized.set(true)
             currentPowerToken.update(initializeInstantDataStream(dataStream))

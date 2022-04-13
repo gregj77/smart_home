@@ -10,6 +10,12 @@ import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.reflect.KClass
 
+interface InstantReading
+
+internal interface PersistableReading {
+    val deviceType: DeviceType
+}
+
 sealed class ElectricReading(val value: BigDecimal, val unit: String, val time: LocalDateTime, val alias: String) {
 
     val id = counter.incrementAndGet()
@@ -34,6 +40,9 @@ sealed class ElectricReading(val value: BigDecimal, val unit: String, val time: 
         InstantReading
 
     class InstantTotalPower(value: BigDecimal, unit: String, time: LocalDateTime, alias: String)
+        : ElectricReading(value, unit, time, alias), InstantReading
+
+    class CurrentVoltage(value: BigDecimal, unit: String, time: LocalDateTime, alias: String)
         : ElectricReading(value, unit, time, alias), InstantReading
 
     companion object {
