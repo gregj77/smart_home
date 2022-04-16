@@ -126,6 +126,8 @@ internal class ElectricPowerMonitoringTest {
 
         victim = victimFactory(Flux.fromIterable(readings), openEvent)
 
+        Thread.sleep(500L)
+
         assertThat(testHub.readingEvents)
             .hasSize(1)
             .element(0)
@@ -156,6 +158,8 @@ internal class ElectricPowerMonitoringTest {
         testHub.onHandleStoreLatestReading = { storedReadings.add(it.second.id.toInt()); it.second.id.toInt() }
 
         victim = victimFactory(Flux.fromIterable(readings), openEvent)
+
+        Thread.sleep(500L)
 
         assertThat(testHub.readingEvents)
             .hasSize(3)
