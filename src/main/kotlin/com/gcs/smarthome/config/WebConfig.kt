@@ -12,8 +12,10 @@ import org.springframework.security.config.web.server.ServerHttpSecurity
 import org.springframework.security.web.server.SecurityWebFilterChain
 import org.springframework.security.web.server.authorization.AuthorizationContext
 import reactor.core.publisher.Mono
+import java.security.SecureRandom
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import java.util.UUID
 import kotlin.random.Random
 
 @EnableWebFluxSecurity
@@ -53,6 +55,6 @@ class WebConfig(meterRegistry: MeterRegistry) {
         tokenValue.set(nextTokenValue().toDouble())
     }
 
-    private fun nextTokenValue() = Random(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC))
-        .nextLong(Integer.MAX_VALUE.toLong(), 68_719_476_735L)
+    private fun nextTokenValue() = SecureRandom(UUID.randomUUID().toString().toByteArray())
+        .nextLong() % 999_991L
 }
