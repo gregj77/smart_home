@@ -5,6 +5,7 @@ import com.gcs.smarthome.data.model.DeviceType
 import com.gcs.smarthome.data.repository.DeviceReadingRepository
 import com.gcs.smarthome.logic.cqrs.GenericCommand
 import com.gcs.smarthome.logic.cqrs.GenericQuery
+import com.gcs.smarthome.logic.message.BusinessDayOpenEvent
 import mu.KotlinLogging
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
@@ -19,7 +20,7 @@ class DeviceReadingHub(private val repository: DeviceReadingRepository)  {
     private val businessDay: AtomicReference<Short> = AtomicReference(-1)
 
     @EventListener
-    fun onNewBusinessDayAssigned(event: BusinessDayHub.BusinessDayOpenEvent) {
+    fun onNewBusinessDayAssigned(event: BusinessDayOpenEvent) {
         logger.info { "business starting - $event" }
         businessDay.set(event.businessDayId)
     }

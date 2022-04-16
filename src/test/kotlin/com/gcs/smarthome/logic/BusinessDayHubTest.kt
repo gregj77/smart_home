@@ -3,6 +3,8 @@ package com.gcs.smarthome.logic
 import com.gcs.smarthome.config.EventingConfiguration
 import com.gcs.smarthome.data.model.BusinessDay
 import com.gcs.smarthome.data.repository.BusinessDayRepository
+import com.gcs.smarthome.logic.message.BusinessDayCloseEvent
+import com.gcs.smarthome.logic.message.BusinessDayOpenEvent
 import com.gcs.smarthome.testutils.VirtualTaskScheduler
 import com.ninjasquad.springmockk.MockkBean
 import io.micrometer.core.instrument.MeterRegistry
@@ -93,25 +95,25 @@ class BusinessDayHubTest  {
         assertThat(testEvents.events).hasSize(5)
         assertThat(testEvents.events[0]).isInstanceOf(ApplicationReadyEvent::class.java)
         assertThat(testEvents.events[1])
-            .isInstanceOf(BusinessDayHub.BusinessDayOpenEvent::class.java)
-            .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayHub.BusinessDayOpenEvent::class.java))
-            .extracting(BusinessDayHub.BusinessDayOpenEvent::date)
+            .isInstanceOf(BusinessDayOpenEvent::class.java)
+            .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayOpenEvent::class.java))
+            .extracting(BusinessDayOpenEvent::date)
             .isEqualTo(LocalDate.of(2022, 1, 1))
         assertThat(testEvents.events[2])
-            .isInstanceOf(BusinessDayHub.BusinessDayCloseEvent::class.java)
-            .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayHub.BusinessDayCloseEvent::class.java))
-            .extracting(BusinessDayHub.BusinessDayCloseEvent::date)
+            .isInstanceOf(BusinessDayCloseEvent::class.java)
+            .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayCloseEvent::class.java))
+            .extracting(BusinessDayCloseEvent::date)
             .isEqualTo(LocalDate.of(2022, 1, 1))
 
         assertThat(testEvents.events[3])
-            .isInstanceOf(BusinessDayHub.BusinessDayOpenEvent::class.java)
-            .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayHub.BusinessDayOpenEvent::class.java))
-            .extracting(BusinessDayHub.BusinessDayOpenEvent::date)
+            .isInstanceOf(BusinessDayOpenEvent::class.java)
+            .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayOpenEvent::class.java))
+            .extracting(BusinessDayOpenEvent::date)
             .isEqualTo(LocalDate.of(2022, 1, 2))
         assertThat(testEvents.events[4])
-            .isInstanceOf(BusinessDayHub.BusinessDayCloseEvent::class.java)
-            .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayHub.BusinessDayCloseEvent::class.java))
-            .extracting(BusinessDayHub.BusinessDayCloseEvent::date)
+            .isInstanceOf(BusinessDayCloseEvent::class.java)
+            .asInstanceOf(InstanceOfAssertFactories.type(BusinessDayCloseEvent::class.java))
+            .extracting(BusinessDayCloseEvent::date)
             .isEqualTo(LocalDate.of(2022, 1, 2))
 
         assertThat(victim.secondsSinceDayStart).isEqualTo(LocalTime.of(23, 59, 55).toSecondOfDay().toLong())
@@ -164,12 +166,12 @@ class BusinessDayHubTest  {
         }
 
         @EventListener
-        fun onBusinessDayStart(day: BusinessDayHub.BusinessDayOpenEvent) {
+        fun onBusinessDayStart(day: BusinessDayOpenEvent) {
             events.add(day)
         }
 
         @EventListener
-        fun onBusinessDayEnd(day: BusinessDayHub.BusinessDayCloseEvent) {
+        fun onBusinessDayEnd(day: BusinessDayCloseEvent) {
             events.add(day)
         }
     }

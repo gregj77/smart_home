@@ -5,6 +5,9 @@ import com.gcs.smarthome.data.repository.BusinessDayRepository
 import com.gcs.smarthome.logic.MeterService.Companion.tagTypeDailyValue
 import com.gcs.smarthome.logic.MeterService.Companion.tagTypeMonthlyValue
 import com.gcs.smarthome.logic.MeterService.Companion.tagTypeName
+import com.gcs.smarthome.logic.message.BusinessDayCloseEvent
+import com.gcs.smarthome.logic.message.BusinessDayOpenEvent
+import com.gcs.smarthome.logic.message.ElectricReadingEvent
 import com.google.common.util.concurrent.AtomicDouble
 import io.micrometer.core.instrument.*
 import mu.KotlinLogging
@@ -72,7 +75,7 @@ class ReportingService(
 
 
     @EventListener
-    fun onBusinessDayStart(day: BusinessDayHub.BusinessDayOpenEvent) {
+    fun onBusinessDayStart(day: BusinessDayOpenEvent) {
         logger.info { "initializing reporting service for $day" }
         businessDay.set(day.date)
 
@@ -83,7 +86,7 @@ class ReportingService(
     }
 
     @EventListener
-    fun onBusinessDayEnd(day: BusinessDayHub.BusinessDayCloseEvent) {
+    fun onBusinessDayEnd(day: BusinessDayCloseEvent) {
         logger.info { "closing business day for $day" }
         counters.clear()
         meterService.cleanupDailyMeters(day.date)

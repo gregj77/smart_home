@@ -7,6 +7,7 @@ import com.gcs.smarthome.data.repository.BusinessDayRepository
 import com.gcs.smarthome.data.repository.ReferenceStateRepository
 import com.gcs.smarthome.logic.cqrs.EventPublisher
 import com.gcs.smarthome.logic.cqrs.GenericCommand
+import com.gcs.smarthome.logic.message.BusinessDayOpenEvent
 import com.gcs.smarthome.web.Reading
 import mu.KotlinLogging
 import org.springframework.context.event.EventListener
@@ -44,7 +45,7 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
 
     @EventListener
     @Transactional
-    fun onNewBusinessDay(args: BusinessDayHub.BusinessDayOpenEvent) {
+    fun onNewBusinessDay(args: BusinessDayOpenEvent) {
         businessDayId = args.businessDayId
         ReferenceType
             .values()

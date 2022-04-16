@@ -3,6 +3,8 @@ package com.gcs.smarthome.logic
 import com.gcs.smarthome.data.model.BusinessDay
 import com.gcs.smarthome.data.repository.BusinessDayRepository
 import com.gcs.smarthome.logic.cqrs.EventPublisher
+import com.gcs.smarthome.logic.message.BusinessDayCloseEvent
+import com.gcs.smarthome.logic.message.BusinessDayOpenEvent
 import com.google.common.util.concurrent.AtomicDouble
 import io.micrometer.core.instrument.Tags
 import mu.KotlinLogging
@@ -91,9 +93,6 @@ class BusinessDayHub (private val repository: BusinessDayRepository,
             return Pair(result.id, result.reference)
         }
     }
-
-    data class BusinessDayOpenEvent(val businessDayId: Short, val date: LocalDate)
-    data class BusinessDayCloseEvent(val businessDayId: Short, val date: LocalDate)
 
     companion object {
         const val BUSINESS_DAY_UP_GAUGE = "business_day_up"

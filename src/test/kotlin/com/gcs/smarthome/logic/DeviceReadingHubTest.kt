@@ -5,8 +5,8 @@ import com.gcs.smarthome.data.model.DeviceReading
 import com.gcs.smarthome.data.model.DeviceType
 import com.gcs.smarthome.data.repository.DeviceReadingRepository
 import com.gcs.smarthome.logic.cqrs.EventPublisher
+import com.gcs.smarthome.logic.message.BusinessDayOpenEvent
 import com.gcs.smarthome.testutils.JpaConfig
-import kotlinx.coroutines.reactive.awaitLast
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Order
@@ -15,18 +15,14 @@ import org.junit.jupiter.api.assertThrows
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.autoconfigure.domain.EntityScan
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.junit.jupiter.SpringExtension
 import java.math.BigDecimal
 import java.time.LocalDateTime
-import java.util.concurrent.ExecutionException
 
 @DataJpaTest
 @ExtendWith(SpringExtension::class)
@@ -60,7 +56,7 @@ class DeviceReadingHubTest {
     @Order(2)
     fun `attempt to save reading after initializing business day works`() {
 
-        eventPublisher.broadcastEvent(BusinessDayHub.BusinessDayOpenEvent(testDay, testTime.toLocalDate()))
+        eventPublisher.broadcastEvent(BusinessDayOpenEvent(testDay, testTime.toLocalDate()))
 
         val msg = DeviceReadingHub.commandStoreReading(
             DeviceType.POWER_METER_EXPORT,

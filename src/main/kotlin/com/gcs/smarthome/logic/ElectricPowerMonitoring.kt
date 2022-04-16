@@ -2,6 +2,8 @@ package com.gcs.smarthome.logic
 
 import com.gcs.smarthome.data.model.DeviceType
 import com.gcs.smarthome.logic.cqrs.EventPublisher
+import com.gcs.smarthome.logic.message.BusinessDayOpenEvent
+import com.gcs.smarthome.logic.message.ElectricReadingEvent
 import com.google.common.util.concurrent.AtomicDouble
 import io.micrometer.core.instrument.Tags
 import mu.KotlinLogging
@@ -33,7 +35,7 @@ class ElectricPowerMonitoring(
     private val currentPowerToken = Disposables.swap()
 
     @EventListener
-    fun onNewBusinessDay(day: BusinessDayHub.BusinessDayOpenEvent) {
+    fun onNewBusinessDay(day: BusinessDayOpenEvent) {
         logger.info { "business day starting $day" }
         persistableReadingToken.update(initializePersistableDataStream(dataStream, day.businessDayId, day.date))
         if (!isInitialized.get()) {
@@ -43,12 +45,12 @@ class ElectricPowerMonitoring(
     }
 
     @PostConstruct
-    private fun onInitialize() {
+    fun onInitialize() {
         logger.info { "starting instant data monitoring..." }
     }
 
     @PreDestroy
-    private fun onDestroy() {
+    fun onDestroy() {
         persistableReadingToken.dispose()
         currentPowerToken.dispose()
     }
@@ -163,8 +165,3 @@ class ElectricPowerMonitoring(
     }
 }
 
-data class ElectricReadingEvent(
-    val deviceType: DeviceType,
-    val alias: String,
-    val value: Double,
-    val deltaSinceLastReading: Double)
