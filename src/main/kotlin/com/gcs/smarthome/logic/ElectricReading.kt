@@ -20,6 +20,9 @@ sealed class ElectricReading(val value: BigDecimal, val unit: String, val time: 
 
     val id = counter.incrementAndGet()
 
+    val formattedReading: String
+        get() = "$value $unit"
+
     class ExportedPower(value: BigDecimal, unit: String, time: LocalDateTime, alias: String)
         : ElectricReading(value, unit, time, alias), PersistableReading {
         override val deviceType = classToDeviceMapping[ExportedPower::class]!!
