@@ -21,7 +21,7 @@ class SmartHomeDataAnalysisApplication {
 	companion object {
 		@JvmStatic
 		fun main(args: Array<String>) {
-			TimeZone.setDefault(TimeZone.getTimeZone("CET"))
+			//TimeZone.setDefault(TimeZone.getTimeZone("CET"))
 			runApplication<SmartHomeDataAnalysisApplication>(*args)
 		}
 	}

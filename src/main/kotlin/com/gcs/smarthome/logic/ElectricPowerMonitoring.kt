@@ -91,14 +91,14 @@ class ElectricPowerMonitoring(
                 { err -> logger.error { "failure while processing stream - ${err.message} <${err.javaClass.name}>\n${err.stackTrace}" } }
 
     private fun processNewReading(reading: ReadingAggregationContext) {
-        eventPublisher.broadcastEvent(ElectricReadingEvent(reading.deviceType, reading.alias, reading.currentReading.toDouble(), reading.delta.toDouble()))
-
         eventPublisher
             .command(DeviceReadingHub.commandStoreReading(reading.deviceType, reading.reading))
             .retryWhen(RetrySpec.fixedDelay(5, Duration.ofSeconds(1)))
             .subscribe(
                 { logger.debug { "${reading.reading.id}) stored ${reading.alias}.${reading.deviceType} reading ${reading.reading.formattedReading} with id = $it" } },
                 { err -> logger.warn { "${reading.reading.id}) failed to save reading ${reading.deviceType} - ${err.message} <${err.javaClass.name}>" } } )
+
+        eventPublisher.broadcastEvent(ElectricReadingEvent(reading.deviceType, reading.alias, reading.currentReading.toDouble(), reading.delta.toDouble(), reading.reading.time))
     }
     private fun initializeInstantDataStream(stream: Flux<out ElectricReading>) =
         stream

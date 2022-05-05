@@ -16,7 +16,7 @@
 	<properties>
 		<java.version>11</java.version>
 		<kotlin.version>1.6.10</kotlin.version>
-		<modbusAdapter.version>1.0.67</modbusAdapter.version>
+		<modbusAdapter.version>1.0.85</modbusAdapter.version>
 		<grpc.net.devh.version>2.13.1.RELEASE</grpc.net.devh.version>
 		<kotlin.logging.version>2.0.11</kotlin.logging.version>
 	</properties>
