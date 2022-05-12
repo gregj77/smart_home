@@ -11,87 +11,15 @@ import com.gcs.smarthome.logic.message.ElectricReadingEvent
 import com.google.common.util.concurrent.AtomicDouble
 import io.micrometer.core.instrument.*
 import mu.KotlinLogging
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.event.EventListener
-import org.springframework.stereotype.Service
-import reactor.core.publisher.DirectProcessor
-import reactor.core.publisher.Flux
-import reactor.core.publisher.FluxProcessor
-import reactor.core.publisher.Sinks
-import reactor.core.scheduler.Scheduler
 import java.math.BigDecimal
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.annotation.PostConstruct
 
-@Service
-class ReportingService(
-    private val businessDayRepository: BusinessDayRepository,
-    private val config: ElectricPowerMonitoringConfig.ConfigurationResult,
-    private val scheduler: Scheduler,
-    @Value("\${reportingService.maxDaysInHistory:30}") private val maxDaysInHistory: Long
-) {
-
-    private val deviceTypes = mapOf<Int, (Double, Double, LocalDate) -> ElectricReadingEvent>(
-        DeviceType.POWER_METER_EXPORT.ordinal to { value, delta, date -> ElectricReadingEvent(DeviceType.POWER_METER_EXPORT, config.metricsMapping[DeviceType.POWER_METER_EXPORT]!!, value, delta, LocalDateTime.of(date, LocalTime.MIDNIGHT) ) },
-        DeviceType.POWER_METER_IMPORT.ordinal to { value, delta, date -> ElectricReadingEvent(DeviceType.POWER_METER_IMPORT, config.metricsMapping[DeviceType.POWER_METER_IMPORT]!!, value, delta, LocalDateTime.of(date, LocalTime.MIDNIGHT) ) },
-        DeviceType.POWER_METER_PRODUCTION.ordinal to { value, delta, date -> ElectricReadingEvent(DeviceType.POWER_METER_PRODUCTION, config.metricsMapping[DeviceType.POWER_METER_PRODUCTION]!!, value, delta, LocalDateTime.of(date, LocalTime.MIDNIGHT) ) },
-    )
-
-    private val logger = KotlinLogging.logger {  }
-
-    val dailyReadings = Sinks
-        .many()
-        .multicast()
-        .onBackpressureBuffer<ElectricReadingEvent>()
-
-    @PostConstruct
-    fun onInitialize() {
-
-        dailyReadings
-            .asFlux()
-            .groupBy { it.timestamp.toLocalDate() }
-            .map { dailyStream ->
-                var lastTime = LocalDateTime.MIN
-                //dailyStream.key().minusDays( scheduler.now(TimeUnit.MINUTES).
-                var idx = 0
-                dailyStream
-                    .filter {
-                        val result = it.timestamp > lastTime
-                        lastTime = it.timestamp
-                        result
-                    }
-                    .map { Triple(idx++, dailyStream.key(), it) }
-                    .take(Duration.ofDays(maxDaysInHistory), scheduler)
-                    //.doOnSubscribe{ it.}
-            }
-            //.sw
-
-    }
-
-    @EventListener
-    fun onBusinessDayStart(day: BusinessDayOpenEvent) {
-        logger.info { "initializing reporting service for $day" }
-
-        businessDayRepository
-            .loadDeviceDailyReport(deviceTypes.keys, LocalDate.now().minusDays(maxDaysInHistory), LocalDate.now())
-            .map { deviceTypes[it.deviceType.ordinal]!!.invoke(it.value.toDouble(), it.dailyDelta.toDouble(), it.date) }
-            .forEach { dailyReadings.tryEmitNext(it) }
-
-        //many.asFlux().
-
-
-    }
-
-
-}
-
-@Service
+//@Service
 class ReportingServiceOld(
     private val businessDayRepository: BusinessDayRepository,
     private val cfg : ElectricPowerMonitoringConfig.ConfigurationResult,
@@ -181,7 +109,7 @@ class ReportingServiceOld(
                 "totalImport= ${totalElectricityImported.get()}" }
     }
 
-    @EventListener
+ //   @EventListener
     fun onNewMeterReading(args: ElectricReadingEvent) {
         readingUpdateEventMap[args.deviceType]?.invoke(args.value)
 
