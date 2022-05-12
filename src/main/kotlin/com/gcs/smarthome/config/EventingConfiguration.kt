@@ -2,21 +2,13 @@ package com.gcs.smarthome.config
 
 import com.gcs.smarthome.logic.cqrs.EventPublisher
 import mu.KotlinLogging
-import org.springframework.context.ApplicationContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.Profile
 import org.springframework.context.event.ApplicationEventMulticaster
 import org.springframework.context.event.SimpleApplicationEventMulticaster
 import org.springframework.core.task.SimpleAsyncTaskExecutor
-import reactor.core.scheduler.Scheduler
-import reactor.core.scheduler.Schedulers
-import java.time.*
-import java.util.TimeZone
-import java.util.WeakHashMap
-import java.util.concurrent.TimeUnit
-import javax.annotation.PostConstruct
+import java.time.Duration
 
 @Configuration
 class EventingConfiguration {

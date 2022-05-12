@@ -1,7 +1,6 @@
 package com.gcs.smarthome.logic
 
 import mu.KotlinLogging
-import org.springframework.data.auditing.CurrentDateTimeProvider
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.support.CronTrigger
 import org.springframework.stereotype.Service

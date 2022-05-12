@@ -90,7 +90,7 @@ class DailyReportingService(
 
     @EventListener
     fun onBusinessDayStart(day: BusinessDayOpenEvent) {
-        logger.info { "initializing reporting service for $day" }
+        logger.info { "initializing daily reporting service for $day" }
 
         val now = localDateProvider()
         businessDayRepository

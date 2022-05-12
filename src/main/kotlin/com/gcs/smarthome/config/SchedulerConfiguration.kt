@@ -1,11 +1,8 @@
 package com.gcs.smarthome.config
 
-import org.springframework.boot.context.event.ApplicationContextInitializedEvent
-import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
-import org.springframework.context.event.EventListener
 import reactor.core.scheduler.Scheduler
 import reactor.core.scheduler.Schedulers
 import java.time.*
