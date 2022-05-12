@@ -1,6 +1,7 @@
 package com.gcs.smarthome.logic
 
 import mu.KotlinLogging
+import org.springframework.data.auditing.CurrentDateTimeProvider
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.support.CronTrigger
 import org.springframework.stereotype.Service
@@ -14,21 +15,23 @@ import java.util.*
 import kotlin.reflect.KClass
 
 @Service
-class SmartHomeTaskScheduler(private val scheduler: TaskScheduler) {
+class SmartHomeTaskScheduler(
+    private val scheduler: TaskScheduler,
+    val dateProvider: () -> LocalDate,
+    val timeProvider: () -> LocalTime,
+    val dateTimeProvider: () -> LocalDateTime,
+    val timeZone: TimeZone) {
 
     private val logger = KotlinLogging.logger {  }
 
-    val timeZone: TimeZone
-        get() = TimeZone.getDefault()
-
     val dateTime: LocalDateTime
-        get() = LocalDateTime.ofInstant(scheduler.clock.instant(), timeZone.toZoneId())
+        get() = dateTimeProvider()
 
     val date: LocalDate
-        get() = LocalDate.ofInstant(scheduler.clock.instant(), timeZone.toZoneId())
+        get() = dateProvider()
 
     val time: LocalTime
-        get() = LocalTime.ofInstant(scheduler.clock.instant(), timeZone.toZoneId())
+        get() = timeProvider()
 
     fun <T> schedule(expression: String, clazz: KClass<T>, startImmediately: Boolean = false) : Flux<T> where T : Temporal {
 
@@ -45,14 +48,18 @@ class SmartHomeTaskScheduler(private val scheduler: TaskScheduler) {
                 }
 
                 val onCronTask = Runnable {
-                    observer.next(mappingFunc())
+                    try {
+                        observer.next(mappingFunc())
+                    } catch (err: Exception) {
+                        observer.error(err)
+                    }
                 }
 
                 if (startImmediately) {
                     onCronTask.run()
                 }
 
-                val subscription = scheduler.schedule(onCronTask, CronTrigger(expression, TimeZone.getDefault()))!!
+                val subscription = scheduler.schedule(onCronTask, CronTrigger(expression, timeZone))!!
 
                 observer.onDispose {
                     logger.info { "subscription of $expression cancelled..." }

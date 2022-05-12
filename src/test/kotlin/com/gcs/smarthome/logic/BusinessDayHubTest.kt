@@ -1,6 +1,7 @@
 package com.gcs.smarthome.logic
 
 import com.gcs.smarthome.config.EventingConfiguration
+import com.gcs.smarthome.config.SchedulerConfiguration
 import com.gcs.smarthome.data.model.BusinessDay
 import com.gcs.smarthome.data.repository.BusinessDayRepository
 import com.gcs.smarthome.logic.message.BusinessDayCloseEvent
@@ -24,6 +25,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.annotation.EnableScheduling
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.junit.jupiter.SpringExtension
 import org.springframework.transaction.PlatformTransactionManager
@@ -35,6 +37,7 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 
+@ActiveProfiles("TEST")
 @ExtendWith(SpringExtension::class)
 @ContextConfiguration(classes = [BusinessDayHubTest.ScopedConfig::class])
 class BusinessDayHubTest  {
@@ -129,7 +132,7 @@ class BusinessDayHubTest  {
 
     @Configuration
     @EnableScheduling
-    @Import(value = [BusinessDayHub::class, SmartHomeTaskScheduler::class, EventingConfiguration::class, MeterService::class])
+    @Import(value = [BusinessDayHub::class, SmartHomeTaskScheduler::class, EventingConfiguration::class, MeterService::class, SchedulerConfiguration::class])
     class ScopedConfig {
         val testTime = OffsetDateTime.parse("2022-01-01T12:00:00Z", DateTimeFormatter.ISO_DATE_TIME).toInstant()
         final val scheduler = VirtualTimeScheduler.create()
@@ -140,7 +143,6 @@ class BusinessDayHubTest  {
 
         @Bean
         fun taskScheduler(): TaskScheduler {
-            TimeZone.setDefault(TimeZone.getTimeZone("CET"))
             scheduler.advanceTimeTo(testTime)
             return taskScheduler
         }
@@ -151,10 +153,6 @@ class BusinessDayHubTest  {
         @Bean
         fun myListener() : TestEventListener = TestEventListener()
 
-        @Bean
-        fun currentTime(smartHomeTaskScheduler: SmartHomeTaskScheduler) : () -> LocalDate {
-            return { smartHomeTaskScheduler.date }
-        }
     }
 
     class TestEventListener : ApplicationListener<ApplicationReadyEvent> {

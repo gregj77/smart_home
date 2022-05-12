@@ -52,6 +52,6 @@ class WebConfig(meterRegistry: MeterRegistry) {
         tokenValue.set(nextTokenValue().toDouble())
     }
 
-    private fun nextTokenValue() = SecureRandom(UUID.randomUUID().toString().toByteArray())
+    private fun nextTokenValue() = 1_000_000L + SecureRandom(UUID.randomUUID().toString().toByteArray())
         .nextLong() % 999_991L
 }

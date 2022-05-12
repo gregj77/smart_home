@@ -1,5 +1,6 @@
 package com.gcs.smarthome.logic
 
+import com.gcs.smarthome.config.SchedulerConfiguration
 import com.gcs.smarthome.testutils.VirtualTaskScheduler
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.Test
 
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.scheduling.TaskScheduler
+import reactor.core.scheduler.Scheduler
 import reactor.test.scheduler.VirtualTimeScheduler
 import java.time.*
 import java.time.format.DateTimeFormatter
@@ -25,11 +27,16 @@ internal class SmartHomeTaskSchedulerTest {
 
     @BeforeEach
     fun setUp() {
-        TimeZone.setDefault(TimeZone.getTimeZone("CET"))
         scheduler = VirtualTimeScheduler.create()
         val taskScheduler = VirtualTaskScheduler(scheduler!!)
-        victim = SmartHomeTaskScheduler(taskScheduler)
-        zoneId = victim!!.timeZone.toZoneId()
+        val config = SchedulerConfiguration()
+        zoneId = config.zoneId(TimeZone.getDefault())
+        victim = SmartHomeTaskScheduler(
+            taskScheduler,
+            config.localDateProvider(scheduler as Scheduler, zoneId!!),
+            config.localTimeProvider(scheduler as Scheduler, zoneId!!),
+            config.localDateTimeProvider(scheduler as Scheduler, zoneId!!),
+            config.timeZone())
         scheduler!!.advanceTimeTo(testTime)
     }
 
@@ -40,7 +47,7 @@ internal class SmartHomeTaskSchedulerTest {
         assertThat(victim!!.time).isEqualTo(LocalTime.of(14, 1, 5))
         assertThat(victim!!.date).isEqualTo(LocalDate.of(2022, 1, 1))
         assertThat(victim!!.dateTime).isEqualTo(LocalDateTime.of(2022, 1, 1, 14, 1, 5))
-        assertThat(victim!!.timeZone.id).isEqualTo("CET")
+        assertThat(victim!!.timeZone.id).isEqualTo("Europe/Warsaw")
     }
 
     @Test

@@ -19,6 +19,7 @@ import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.junit.jupiter.SpringExtension
 import reactor.core.publisher.Flux
 import java.time.Instant
+import java.time.ZoneId
 
 @ExtendWith(SpringExtension::class)
 @ActiveProfiles("grpc")
@@ -31,7 +32,6 @@ class ElectricPowerMonitoringConfigTest {
 
     @Autowired
     lateinit var electricReadingStream: Flux<ElectricReading>
-
 
 
     @Test
@@ -107,6 +107,11 @@ class ElectricPowerMonitoringConfigTest {
 
     @Configuration
     class ScopedConfig {
+
+        @Bean
+        fun zoneId() : ZoneId {
+            return ZoneId.of("CET")
+        }
 
         @Bean
         fun responseStreamFactory(): (Query) -> Flux<Response> {

@@ -57,10 +57,10 @@ sealed class ElectricReading(val value: BigDecimal, val unit: String, val time: 
             ProducedPower::class to DeviceType.POWER_METER_PRODUCTION
         )
 
-        fun fromResponse(alias: String, response: Response, target: Constructor<ElectricReading>) : ElectricReading {
+        fun fromResponse(alias: String, response: Response, target: Constructor<ElectricReading>, zoneId: ZoneId) : ElectricReading {
             val readingValue = response.value.toFloat().toBigDecimal()
             val readingTime = Instant.ofEpochSecond(response.time.seconds, response.time.nanos.toLong())
-                .atZone(ZoneId.systemDefault())
+                .atZone(zoneId)
                 .toLocalDateTime()
 
             return target.newInstance(readingValue, response.unit, readingTime, alias)

@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import reactor.core.publisher.Flux
 import java.lang.reflect.Constructor
+import java.time.ZoneId
 
 @Configuration
 class ElectricPowerMonitoringConfig(private val monitoringConfiguration: MonitoringConfiguration) {
@@ -15,7 +16,7 @@ class ElectricPowerMonitoringConfig(private val monitoringConfiguration: Monitor
     private val logger = KotlinLogging.logger {  }
 
     @Bean
-    protected fun processConfiguration(): ConfigurationResult {
+    protected fun processConfiguration(zoneId: ZoneId): ConfigurationResult {
         val queryBuilder = Query.newBuilder()
 
         val mapping = mutableMapOf<Pair<String, DeviceFunction>, (Response) -> ElectricReading>()
@@ -43,7 +44,7 @@ class ElectricPowerMonitoringConfig(private val monitoringConfiguration: Monitor
                         val ctor = @Suppress("UNCHECKED_CAST")(function.readingType.constructors[0] as Constructor<ElectricReading>)
                         val aliasForMetricsRegistry = function.alias.lowercase().replace(Regex("\\s+"), "_")
                         mapping[Pair(device.deviceName, function.functionName)] = { response ->
-                            ElectricReading.fromResponse(aliasForMetricsRegistry, response, ctor)
+                            ElectricReading.fromResponse(aliasForMetricsRegistry, response, ctor, zoneId)
                         }
 
                         if (ElectricReading.classToDeviceMapping.containsKey(function.readingType.kotlin)) {
