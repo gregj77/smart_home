@@ -16,19 +16,7 @@ class MeterService(private val meterRegistry: MeterRegistry) {
     private val dailyDateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd")
     private val meters: ConcurrentMap<Meter.Id, Any> = ConcurrentHashMap()
 
-    fun cleanupDailyMeters(date: LocalDate) {
-        synchronized(meters) {
-            val currentDayTag = tagForDailyMeter(date).first()
-            val toRemove = meters
-                .keys
-                .filter { filterByTag(currentDayTag).test(it) }
-                .toList()
-
-            removeMeters(toRemove)
-        }
-    }
-
-    fun listMeterIdsBy(filter: Predicate<Meter.Id>) : MutableList<Meter.Id> = meters.keys.filter { filter.test(it) }.toMutableList()
+    fun listMeterIdsBy(filter: Predicate<Meter.Id>) : List<Meter.Id> = meters.keys.filter { filter.test(it) }.toList()
 
     fun meterById(id: Meter.Id): Any? {
         return meters[id]
@@ -66,10 +54,6 @@ class MeterService(private val meterRegistry: MeterRegistry) {
         return callWithContext(initialTags)
     }
 
-    fun <X, T: Triple<Meter.Id, X, Boolean>> withCurrentDayTag( callWithContext: (Tags) -> Triple<Meter.Id, X, Boolean> ): Triple<Meter.Id, X, Boolean> {
-        return withDayTag<X, T>(LocalDate.now(), callWithContext);
-    }
-
     private fun tagForDailyMeter(date: LocalDate) =
         Tags.of("date", date.format(dailyDateFormat))
 
@@ -91,6 +75,10 @@ class MeterService(private val meterRegistry: MeterRegistry) {
 
         fun filterByTag(toCompare: Tag) : Predicate<Meter.Id> {
             return Predicate<Meter.Id> { id -> id.tags.any { it == toCompare } }
+        }
+
+        fun filterByNameContaining(toCompare: String) : Predicate<Meter.Id> {
+            return Predicate<Meter.Id> { id -> id.name.contains(toCompare) }
         }
 
         fun filterByDailyTag() : Predicate<Meter.Id> {

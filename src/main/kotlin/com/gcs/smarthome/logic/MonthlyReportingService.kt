@@ -10,6 +10,8 @@ import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import reactor.core.Disposables
 import reactor.core.publisher.Flux
+import reactor.core.publisher.GroupedFlux
+import reactor.core.publisher.Mono
 import reactor.core.publisher.Sinks
 import reactor.kotlin.core.publisher.toFlux
 import reactor.util.retry.RetrySpec
@@ -44,31 +46,7 @@ class MonthlyReportingService(
             .groupBy { reading -> Pair(reading.monthAndYear, reading.deviceType) }
             .flatMap { readingStream ->
                 val (monthAndYear, deviceType) = readingStream.key()
-
-                logger.info { "initializing monthly report for $monthAndYear for ${config.metricsMapping[deviceType]}" }
-                
-                val gaugeName = "monthly_${config.metricsMapping[deviceType]}_total"
-                val tags = Tags.of(
-                    ImmutableTag(MeterService.tagTypeName, MeterService.tagTypeMonthlyValue),
-                    ImmutableTag("date", monthAndYear),
-                    ImmutableTag("year", monthAndYear.dropLast(3))
-                )
-
-                val (id, storage, _) = meterService.createOrGetGauge(gaugeName, tags ) { AtomicDouble(0.0) }
-
-                val reduceFunction: (AtomicDouble, Double) -> AtomicDouble = { acc, reading ->
-                    logger.info { "monthly report for $monthAndYear of $deviceType => $reading (change since last: ${reading - acc.get()})" }
-                    acc.set(reading)
-                    acc
-                }
-
-                readingStream
-                    .map(MonthlyReading::value)
-                    .reduce(storage, reduceFunction)
-                    .doOnCancel {
-                        logger.info { "meter for $deviceType[$monthAndYear] is cancelled" }
-                        meterService.removeMeters(listOf(id))
-                    }
+                configureMeterForDevice(monthAndYear, deviceType, readingStream)
             }
             .subscribe())
 
@@ -87,9 +65,41 @@ class MonthlyReportingService(
             .subscribe(monthlyReadings::tryEmitNext) { err -> logger.error { "failed to load monthly report - ${err.message} <${err.javaClass.name}>\n${err.stackTrace}" } })
     }
 
+
     @PreDestroy
     fun onDestroy() {
         subscriptions.dispose()
+    }
+
+    private fun configureMeterForDevice(
+        monthAndYear: String,
+        deviceType: DeviceType,
+        readingStream: GroupedFlux<Pair<String, DeviceType>, MonthlyReading>
+    ): Mono<AtomicDouble> {
+        logger.info { "initializing monthly report for $monthAndYear for ${config.metricsMapping[deviceType]}" }
+
+        val gaugeName = "monthly_${config.metricsMapping[deviceType]}_total"
+        val tags = Tags.of(
+            ImmutableTag(MeterService.tagTypeName, MeterService.tagTypeMonthlyValue),
+            ImmutableTag("date", monthAndYear),
+            ImmutableTag("year", monthAndYear.dropLast(3))
+        )
+
+        val (id, storage, _) = meterService.createOrGetGauge(gaugeName, tags) { AtomicDouble(0.0) }
+
+        val reduceFunction: (AtomicDouble, Double) -> AtomicDouble = { acc, reading ->
+            logger.debug { "monthly report for $monthAndYear of $deviceType => $reading (change since last: ${reading - acc.get()})" }
+            acc.set(reading)
+            acc
+        }
+
+        return readingStream
+            .map(MonthlyReading::value)
+            .reduce(storage, reduceFunction)
+            .doOnCancel {
+                logger.info { "meter for $deviceType[$monthAndYear] is cancelled" }
+                meterService.removeMeters(listOf(id))
+            }
     }
 
     private data class MonthlyReading(val monthAndYear: String, val deviceType: DeviceType, val value: Double) {

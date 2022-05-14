@@ -13,6 +13,7 @@ import mu.KotlinLogging
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import javax.transaction.Transactional
@@ -34,7 +35,7 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
             val allEntries = repository.findAllByReferenceTypeOrderByBusinessDayDesc(result.referenceType)
 
             if (allEntries.first().id == result.id) {
-                val event = NewReferenceReading(result.referenceType, result.value, result.importReading?.id, result.importReading?.value, result.exportReading?.id, result.exportReading?.value)
+                val event = NewReferenceReading(result.createdOn, result.referenceType, result.value, result.importReading?.id, result.importReading?.value, result.exportReading?.id, result.exportReading?.value)
                 logger.info { "broadcasting update event $event" }
                 eventPublisher.broadcastEvent(event)
             }
@@ -53,7 +54,7 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
             .filterNot { it.isEmpty }
             .map { it.get() }
             .forEach {
-                val event = NewReferenceReading(it.referenceType, it.value, it.importReading?.id, it.importReading?.value, it.exportReading?.id, it.exportReading?.value)
+                val event = NewReferenceReading(it.createdOn, it.referenceType, it.value, it.importReading?.id, it.importReading?.value, it.exportReading?.id, it.exportReading?.value)
                 logger.info { "broadcasting $event..." }
                 eventPublisher.broadcastEvent(event)
             }
@@ -111,6 +112,7 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
 }
 
 data class NewReferenceReading(
+    val readingDate: LocalDateTime,
     val referenceType: ReferenceType,
     val value: BigDecimal,
     val importReadingId: Int?,
