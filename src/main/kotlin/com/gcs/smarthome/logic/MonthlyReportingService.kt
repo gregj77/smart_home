@@ -9,9 +9,13 @@ import io.micrometer.core.instrument.Tags
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import reactor.core.Disposables
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
 import reactor.kotlin.core.publisher.toFlux
+import reactor.util.retry.RetrySpec
+import java.time.Duration
 import java.time.LocalDate
+import java.util.*
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
 
@@ -42,6 +46,7 @@ class MonthlyReportingService(
                 val (monthAndYear, deviceType) = readingStream.key()
 
                 logger.info { "initializing monthly report for $monthAndYear for ${config.metricsMapping[deviceType]}" }
+                
                 val gaugeName = "monthly_${config.metricsMapping[deviceType]}_total"
                 val tags = Tags.of(
                     ImmutableTag(MeterService.tagTypeName, MeterService.tagTypeMonthlyValue),
@@ -67,14 +72,18 @@ class MonthlyReportingService(
             }
             .subscribe())
 
-        businessDayRepository.loadDeviceMonthlyReport(deviceTypes, null)
-            .map(MonthlyReading::fromDeviceReadingMonthlyReport)
-            .forEach(monthlyReadings::tryEmitNext)
-
-        subscriptions.add(taskScheduler
-            .schedule("7 15,45 * ? * *", LocalDate::class, false)
-            .map { it.year * 100 + it.month.value }
-            .flatMap { businessDayRepository.loadDeviceMonthlyReport(deviceTypes, it).map(MonthlyReading::fromDeviceReadingMonthlyReport).toFlux() }
+        subscriptions.add(Flux.merge(
+            taskScheduler
+                .schedule("7 10 0 1 * *", LocalDate::class, true)
+                .map { OptionalInt.empty() },
+            taskScheduler
+                .schedule("7 15,45 * ? * *", LocalDate::class, false)
+                .map { OptionalInt.of(it.year * 100 + it.monthValue) })
+            .flatMap { businessDayRepository
+                .loadDeviceMonthlyReport(deviceTypes, if (it.isPresent) it.asInt else null)
+                .map(MonthlyReading::fromDeviceReadingMonthlyReport)
+                .toFlux() }
+            .retryWhen(RetrySpec.fixedDelay(5, Duration.ofSeconds(1)))
             .subscribe(monthlyReadings::tryEmitNext) { err -> logger.error { "failed to load monthly report - ${err.message} <${err.javaClass.name}>\n${err.stackTrace}" } })
     }
 

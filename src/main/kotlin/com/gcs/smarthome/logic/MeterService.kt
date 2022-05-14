@@ -30,6 +30,10 @@ class MeterService(private val meterRegistry: MeterRegistry) {
 
     fun listMeterIdsBy(filter: Predicate<Meter.Id>) : MutableList<Meter.Id> = meters.keys.filter { filter.test(it) }.toMutableList()
 
+    fun meterById(id: Meter.Id): Any? {
+        return meters[id]
+    }
+
     fun createOrGetCounter(counterName: String, tags: Tags, initialReading: Double): Triple<Meter.Id, Counter, Boolean> {
         val key = Meter.Id(counterName, tags, null, null, Meter.Type.COUNTER)
         var createdNew = false
