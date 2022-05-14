@@ -13,7 +13,6 @@ import mu.KotlinLogging
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
-import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import javax.transaction.Transactional
@@ -21,7 +20,8 @@ import javax.transaction.Transactional
 @Service
 class ReferenceStateHub(private val repository: ReferenceStateRepository,
                         private val businessDayRepository: BusinessDayRepository,
-                        private val eventPublisher: EventPublisher) {
+                        private val eventPublisher: EventPublisher,
+                        private val localDateTimeSupplier: () -> LocalDateTime) {
     private val logger = KotlinLogging.logger {  }
 
     private var businessDayId: Short = 0
@@ -29,23 +29,32 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
     @EventListener
     @Transactional
     fun onStoreLatestReferenceReadingCommand(args: StoreLatestReferenceCommand) {
-        args.applyEvent {
-            val result = handleLatestReferenceReading(it)
+        args.handle {
+            val id = handleLatestReferenceReading(it)?.let { result ->
 
-            val allEntries = repository.findAllByReferenceTypeOrderByBusinessDayDesc(result.referenceType)
+                val allEntries = repository.findAllByReferenceTypeOrderByBusinessDayDesc(result.referenceType)
 
-            if (allEntries.first().id == result.id) {
-                val event = NewReferenceReading(result.createdOn, result.referenceType, result.value, result.importReading?.id, result.importReading?.value, result.exportReading?.id, result.exportReading?.value)
-                logger.info { "broadcasting update event $event" }
-                eventPublisher.broadcastEvent(event)
+                if (allEntries.first().id == result.id) {
+                    val event = NewReferenceReading(
+                        result.createdOn,
+                        result.referenceType,
+                        result.value,
+                        result.importReading?.id,
+                        result.importReading?.value,
+                        result.exportReading?.id,
+                        result.exportReading?.value
+                    )
+                    logger.info { "broadcasting update event $event" }
+                    eventPublisher.broadcastEvent(event)
+                }
+
+                result.id.toInt()
             }
-
-            result.id.toInt()
+            id ?: -1
         }
     }
 
     @EventListener
-    @Transactional
     fun onNewBusinessDay(args: BusinessDayOpenEvent) {
         businessDayId = args.businessDayId
         ReferenceType
@@ -60,12 +69,12 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
             }
     }
 
-    private fun handleLatestReferenceReading(reading: Reading): ReferenceState {
+    private fun handleLatestReferenceReading(reading: Reading): ReferenceState? {
         logger.info { "received new reading - $reading" }
         val businessDay = businessDayRepository.findFirstByReferenceEquals(reading.readingDate)
         if (businessDay.isEmpty) {
             logger.warn { "could not find matching business day for ${reading.readingDate}" }
-            throw IllegalArgumentException("no business day found for ${reading.readingDate}")
+            return null
         }
 
         logger.info { "found business day for ${reading.readingDate} -> ${businessDay.get().id}" }
@@ -85,26 +94,18 @@ class ReferenceStateHub(private val repository: ReferenceStateRepository,
                     .firstOrNull{ it.createdOnTime <= LocalTime.NOON }
 
                 logger.info { "storing new reference state reading, import power: ${exportReading?.value} at ${exportReading?.createdOnTime}, export power: ${importReading?.value} at ${importReading?.createdOnTime}" }
-                repository.save(ReferenceState(reading.value, reading.type, LocalDateTime.now(), importReading, exportReading, businessDay.get()))
+                repository.save(ReferenceState(reading.value, reading.type, localDateTimeSupplier(), importReading, exportReading, businessDay.get()))
             }
             else -> {
                 logger.info { "storing new reference state reading..." }
-                repository.save(ReferenceState(reading.value, reading.type, LocalDateTime.now(), null, null, businessDay.get()))
+                repository.save(ReferenceState(reading.value, reading.type, localDateTimeSupplier(), null, null, businessDay.get()))
             }
         }
 
         logger.info { "stored reference state reading : ${entry.id}" }
         return entry
     }
-
-
-    private interface EventInvoker<TPayload, TResult> {
-        fun applyEvent(callback: (TPayload) -> TResult)
-    }
-
-    class StoreLatestReferenceCommand(reading: Reading) : GenericCommand<Reading, Int>(reading), EventInvoker<Reading, Int> {
-        override fun applyEvent(callback: (Reading) -> Int) = handle(callback)
-    }
+    class StoreLatestReferenceCommand(reading: Reading) : GenericCommand<Reading, Int>(reading)
 
     companion object {
         fun newReferenceReading(reading: Reading) = StoreLatestReferenceCommand(reading)

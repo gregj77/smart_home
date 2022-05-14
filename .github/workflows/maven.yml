@@ -35,7 +35,6 @@ jobs:
           REPOSITORY_TOKEN: ${{ secrets.REPOSITORY_TOKEN }}
 
       - name: Log-in to docker repository
-        if: github.ref == 'refs/heads/main'
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
           username: ${{ secrets.DOCKER_USER }}
@@ -45,3 +44,6 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: mvn -B docker:build docker:push
 
+      - name: Generate docker image on pull request
+        if: github.event_name == 'pull_request'
+        run: mvn -B docker:build docker:push
