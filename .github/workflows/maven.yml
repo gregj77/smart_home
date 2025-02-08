@@ -36,7 +36,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y docker-compose
 
       - name: Fix docker-compose path
-        run: sudo ln -s $(which docker) /usr/local/bin/docker-compose
+        run: echo $(which docker) && echo $(which docker-compose)
 
       - name: Update Version to release
         if: github.ref == 'refs/heads/main'

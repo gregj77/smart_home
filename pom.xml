@@ -244,6 +244,45 @@
 			</plugin>
 
 			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>docker-compose-up</id>
+						<phase>test-compile</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<executable>docker-compose</executable>
+							<arguments>
+								<argument>-f</argument>
+								<argument>${project.basedir}/src/test/resources/docker-compose.yml</argument>
+								<argument>up</argument>
+								<argument>-d</argument>
+							</arguments>
+						</configuration>
+					</execution>
+					<execution>
+						<id>docker-compose-down</id>
+						<phase>package</phase>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<configuration>
+							<executable>docker-compose</executable>
+							<arguments>
+								<argument>-f</argument>
+								<argument>${project.basedir}/src/test/resources/docker-compose.yml</argument>
+								<argument>down</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<!--
+			<plugin>
 				<groupId>com.dkanejs.maven.plugins</groupId>
 				<artifactId>docker-compose-maven-plugin</artifactId>
 				<version>2.5.1</version>
@@ -273,6 +312,7 @@
 					</execution>
 				</executions>
 			</plugin>
+			!-->
 		</plugins>
 	</build>
 
