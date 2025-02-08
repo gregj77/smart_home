@@ -1,4 +1,4 @@
-FROM adoptopenjdk:11-jre-hotspot
+FROM eclipse-temurin:17-jre
 COPY target/dependencies/ ./
 RUN true
 COPY target/snapshot-dependencies/ ./
