@@ -34,6 +34,7 @@ class VirtualTaskScheduler(private val scheduler: VirtualTimeScheduler) : TaskSc
             }, nextTick, TimeUnit.MILLISECONDS
         )
         ctx.update(lastScheduledExecutionTime = Date.from(Instant.ofEpochMilli(scheduler.now(TimeUnit.MILLISECONDS)+1)))
+        subscription.hashCode()
 
         return SchedulingResult(null, nextTick)
     }

@@ -19,6 +19,7 @@
 		<modbusAdapter.version>1.0.97</modbusAdapter.version>
 		<grpc.net.devh.version>2.13.1.RELEASE</grpc.net.devh.version>
 		<kotlin.logging.version>2.0.11</kotlin.logging.version>
+		<kotlin.compiler.opt-in>kotlin.RequiresOptIn</kotlin.compiler.opt-in>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -150,6 +151,7 @@
 				<configuration>
 					<args>
 						<arg>-Xjsr305=strict</arg>
+						<arg>-opt-in=kotlin.RequiresOptIn</arg>
 					</args>
 					<compilerPlugins>
 						<plugin>spring</plugin>
