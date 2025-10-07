@@ -19,7 +19,7 @@
 		<java.version>17</java.version>
 		<kotlin.version>1.8.22</kotlin.version>
 		<modbusAdapter.version>1.0.151</modbusAdapter.version>
-		<grpc.net.devh.version>2.15.0.RELEASE</grpc.net.devh.version>
+		<grpc.net.devh.version>3.1.0.RELEASE</grpc.net.devh.version>
 		<kotlin.logging.version>3.0.5</kotlin.logging.version>
 		<kotlin.compiler.opt-in>kotlin.RequiresOptIn</kotlin.compiler.opt-in>
 		<mysql.connector.version>8.0.33</mysql.connector.version>
