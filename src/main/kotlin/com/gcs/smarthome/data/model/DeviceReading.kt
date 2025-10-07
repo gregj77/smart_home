@@ -3,7 +3,7 @@ package com.gcs.smarthome.data.model
 import org.hibernate.Hibernate
 import java.math.BigDecimal
 import java.time.LocalTime
-import javax.persistence.*
+import jakarta.persistence.*
 
 
 @Entity

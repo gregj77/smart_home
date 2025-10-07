@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.LocalTime
-import javax.transaction.Transactional
+import jakarta.transaction.Transactional
 
 @Service
 class ReferenceStateHub(private val repository: ReferenceStateRepository,
