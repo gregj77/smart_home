@@ -3,11 +3,12 @@ package com.gcs.smarthome.testutils
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.scheduling.Trigger
 import org.springframework.scheduling.TriggerContext
-import org.springframework.scheduling.annotation.AsyncResult
 import reactor.test.scheduler.VirtualTimeScheduler
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Delayed
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -39,24 +40,44 @@ class VirtualTaskScheduler(private val scheduler: VirtualTimeScheduler) : TaskSc
         return SchedulingResult(null, nextTick)
     }
 
+    override fun schedule(task: Runnable, startTime: Instant): ScheduledFuture<*> {
+        TODO("schedule(1) Not yet implemented")
+    }
+
     override fun schedule(task: Runnable, startTime: Date): ScheduledFuture<*> {
-        TODO("Not yet implemented")
+        TODO("schedule(2) Not yet implemented")
+    }
+
+    override fun scheduleAtFixedRate(task: Runnable, startTime: Instant, period: Duration): ScheduledFuture<*> {
+        TODO("scheduleAtFixedRate(1) Not yet implemented")
     }
 
     override fun scheduleAtFixedRate(task: Runnable, startTime: Date, period: Long): ScheduledFuture<*> {
-        TODO("Not yet implemented")
+        TODO("scheduleAtFixedRate(2) Not yet implemented")
+    }
+
+    override fun scheduleAtFixedRate(task: Runnable, period: Duration): ScheduledFuture<*> {
+        TODO("scheduleAtFixedRate(3) Not yet implemented")
     }
 
     override fun scheduleAtFixedRate(task: Runnable, period: Long): ScheduledFuture<*> {
-        TODO("Not yet implemented")
+        TODO("scheduleAtFixedRate(4) Not yet implemented")
+    }
+
+    override fun scheduleWithFixedDelay(task: Runnable, startTime: Instant, delay: Duration): ScheduledFuture<*> {
+        TODO("scheduleWithFixedDelay(1) Not yet implemented")
     }
 
     override fun scheduleWithFixedDelay(task: Runnable, startTime: Date, delay: Long): ScheduledFuture<*> {
-        TODO("Not yet implemented")
+        TODO("scheduleWithFixedDelay(2) Not yet implemented")
+    }
+
+    override fun scheduleWithFixedDelay(task: Runnable, delay: Duration): ScheduledFuture<*> {
+        TODO("scheduleWithFixedDelay(3) Not yet implemented")
     }
 
     override fun scheduleWithFixedDelay(task: Runnable, delay: Long): ScheduledFuture<*> {
-        TODO("Not yet implemented")
+        TODO("scheduleWithFixedDelay(4) Not yet implemented")
     }
 
     override fun getClock(): Clock {
@@ -72,10 +93,11 @@ class TestTriggerContext(private val scheduler: VirtualTimeScheduler) : TriggerC
     private var lastCompletionTime: Date? = null
 
     override fun lastScheduledExecutionTime(): Date? = lastScheduledExecutionTime
-
+    override fun lastScheduledExecution(): Instant? = lastScheduledExecutionTime?.toInstant()
     override fun lastActualExecutionTime(): Date? = lastActualExecutionTime
-
+    override fun lastActualExecution(): Instant? = lastActualExecutionTime?.toInstant()
     override fun lastCompletionTime(): Date? = lastCompletionTime
+    override fun lastCompletion(): Instant? = lastCompletionTime?.toInstant()
 
     override fun getClock(): Clock {
         return Clock.fixed(Instant.ofEpochMilli(scheduler.now(TimeUnit.MILLISECONDS)), TimeZone.getDefault().toZoneId())
@@ -98,7 +120,11 @@ class TestTriggerContext(private val scheduler: VirtualTimeScheduler) : TriggerC
     }
 }
 
-class SchedulingResult<T>(result: T, private val delay: Long) : AsyncResult<T>(result), ScheduledFuture<T>  {
+class SchedulingResult<T>(result: T, private val delay: Long) : CompletableFuture<T>(), ScheduledFuture<T>  {
+    init {
+        complete(result)
+    }
+
     override fun compareTo(other: Delayed): Int {
         return delay.compareTo(other.getDelay(TimeUnit.MILLISECONDS))
     }
