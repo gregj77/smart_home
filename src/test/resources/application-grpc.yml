@@ -40,3 +40,15 @@ monitoring:
           readInterval: 14
           alias: "Main_Export_03"
           readingType: com.gcs.smarthome.logic.ElectricReading.ExportedPower
+        - functionName: CURRENT_AMPERAGE_PHASE1
+          readInterval: 4
+          alias: "Amperage_Phase_1"
+          readingType: com.gcs.smarthome.logic.ElectricReading.CurrentAmperage
+        - functionName: CURRENT_AMPERAGE_PHASE2
+          readInterval: 4
+          alias: "Amperage_Phase_2"
+          readingType: com.gcs.smarthome.logic.ElectricReading.CurrentAmperage
+        - functionName: CURRENT_AMPERAGE_PHASE3
+          readInterval: 4
+          alias: "Amperage_Phase_3"
+          readingType: com.gcs.smarthome.logic.ElectricReading.CurrentAmperage

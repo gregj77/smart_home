@@ -39,7 +39,7 @@ class ElectricPowerMonitoringConfigTest {
         assertTrue(configurationResult.isValid)
 
         assertThat(configurationResult.mapping)
-            .hasSize(8)
+            .hasSize(11)
             .extracting {
                 configurationResult.mapping[Pair("ProductionMeter", DeviceFunction.EXPORT_POWER)]
             }.let {
@@ -87,7 +87,7 @@ class ElectricPowerMonitoringConfigTest {
 
         val received = electricReadingStream.collectList().block()!!
 
-        assertThat(received.size).isEqualTo(8)
+        assertThat(received.size).isEqualTo(11)
 
         val readingTypes : List<Class<*>> = received.map { it.javaClass }.toList()
 
@@ -101,6 +101,9 @@ class ElectricPowerMonitoringConfigTest {
                 ElectricReading.InstantTotalPower::class.java,
                 ElectricReading.ImportedPower::class.java,
                 ElectricReading.ExportedPower::class.java,
+                ElectricReading.CurrentAmperage::class.java,
+                ElectricReading.CurrentAmperage::class.java,
+                ElectricReading.CurrentAmperage::class.java,
             )
     }
 
@@ -180,6 +183,30 @@ class ElectricPowerMonitoringConfigTest {
                         .setValue("1000.0")
                         .setUnit("Wh")
                         .setFunctionName(DeviceFunction.EXPORT_POWER)
+                        .build(),
+                    Response.newBuilder()
+                        .setTime(Timestamp.newBuilder().setSeconds(Instant.now().epochSecond).build())
+                        .setDataType("java.lang.Float")
+                        .setDeviceName("MainMeter")
+                        .setValue("11.22")
+                        .setUnit("A")
+                        .setFunctionName(DeviceFunction.CURRENT_AMPERAGE_PHASE1)
+                        .build(),
+                    Response.newBuilder()
+                        .setTime(Timestamp.newBuilder().setSeconds(Instant.now().epochSecond).build())
+                        .setDataType("java.lang.Float")
+                        .setDeviceName("MainMeter")
+                        .setValue("22.33")
+                        .setUnit("A")
+                        .setFunctionName(DeviceFunction.CURRENT_AMPERAGE_PHASE2)
+                        .build(),
+                    Response.newBuilder()
+                        .setTime(Timestamp.newBuilder().setSeconds(Instant.now().epochSecond).build())
+                        .setDataType("java.lang.Float")
+                        .setDeviceName("MainMeter")
+                        .setValue("33.44")
+                        .setUnit("A")
+                        .setFunctionName(DeviceFunction.CURRENT_AMPERAGE_PHASE3)
                         .build(),
                 ))
             }
