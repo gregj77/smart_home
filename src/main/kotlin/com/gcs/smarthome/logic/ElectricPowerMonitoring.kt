@@ -16,8 +16,8 @@ import java.math.BigDecimal
 import java.time.Duration
 import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.annotation.PostConstruct
-import javax.annotation.PreDestroy
+import jakarta.annotation.PostConstruct
+import jakarta.annotation.PreDestroy
 
 @Service
 class ElectricPowerMonitoring(

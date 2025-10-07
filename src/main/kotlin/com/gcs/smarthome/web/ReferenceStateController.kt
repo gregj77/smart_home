@@ -14,10 +14,10 @@ import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Mono
 import java.math.BigDecimal
 import java.time.LocalDate
-import javax.validation.Valid
-import javax.validation.ValidationException
-import javax.validation.Validator
-import javax.validation.constraints.DecimalMin
+import jakarta.validation.Valid
+import jakarta.validation.ValidationException
+import jakarta.validation.Validator
+import jakarta.validation.constraints.DecimalMin
 
 @RestController
 @RequestMapping("/api/v1/referenceState")

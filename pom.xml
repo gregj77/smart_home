@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>2.6.7</version>
+		<version>3.5.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.gcs</groupId>
@@ -15,11 +15,14 @@
 	<description>Consumer of smart home data to provide analytics</description>
 	<properties>
 		<java.version>17</java.version>
-		<kotlin.version>1.6.10</kotlin.version>
-		<modbusAdapter.version>1.0.97</modbusAdapter.version>
-		<grpc.net.devh.version>2.13.1.RELEASE</grpc.net.devh.version>
-		<kotlin.logging.version>2.0.11</kotlin.logging.version>
+		<kotlin.version>1.8.22</kotlin.version>
+		<modbusAdapter.version>1.0.151</modbusAdapter.version>
+		<grpc.net.devh.version>2.15.0.RELEASE</grpc.net.devh.version>
+		<kotlin.logging.version>3.0.5</kotlin.logging.version>
 		<kotlin.compiler.opt-in>kotlin.RequiresOptIn</kotlin.compiler.opt-in>
+		<mysql.connector.version>8.0.33</mysql.connector.version>
+		<junit.engine.version>6.0.0</junit.engine.version>
+		<flyway.version>9.22.0</flyway.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -58,6 +61,7 @@
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-core</artifactId>
+			<version>${flyway.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.jetbrains.kotlin</groupId>
@@ -90,13 +94,14 @@
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
+			<version>${mysql.connector.version}</version>
 			<scope>runtime</scope>
 		</dependency>
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>
-			<version>5.8.2</version>
+			<version>${junit.engine.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -126,13 +131,13 @@
 		<dependency>
 			<groupId>org.assertj</groupId>
 			<artifactId>assertj-core</artifactId>
-			<version>3.22.0</version>
+			<version>3.27.6</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.ninja-squad</groupId>
 			<artifactId>springmockk</artifactId>
-			<version>3.1.1</version>
+			<version>4.0.2</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
