@@ -4,6 +4,7 @@ import com.google.common.util.concurrent.AtomicDouble
 import io.micrometer.core.instrument.MeterRegistry
 import mu.KotlinLogging
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.authorization.AuthorizationDecision
 import org.springframework.security.authorization.ReactiveAuthorizationManager
@@ -15,10 +16,11 @@ import reactor.core.publisher.Mono
 import java.security.SecureRandom
 import java.util.*
 
+@Configuration
 @EnableWebFluxSecurity
 class WebConfig(meterRegistry: MeterRegistry) {
 
-    private val tokenValue: AtomicDouble
+    private lateinit var tokenValue: AtomicDouble
     private val logger = KotlinLogging.logger {  }
 
     init {
@@ -28,11 +30,12 @@ class WebConfig(meterRegistry: MeterRegistry) {
     @Bean
     fun springSecurityFilterChain(http: ServerHttpSecurity):  SecurityWebFilterChain {
         http
-            .csrf().disable()
-            .cors().disable()
-            .authorizeExchange()
-            .pathMatchers("/api/v1/**").access(accessChecker())
-            .pathMatchers("/**").permitAll()
+            .csrf {  it.disable() }
+            .cors { it.disable()}
+            .authorizeExchange {
+                it.pathMatchers("/api/v1/**").access(accessChecker())
+                    .pathMatchers("/**").permitAll()
+            }
 
         return http.build()
     }
