@@ -48,6 +48,9 @@ sealed class ElectricReading(val value: BigDecimal, val unit: String, val time: 
     class CurrentVoltage(value: BigDecimal, unit: String, time: LocalDateTime, alias: String)
         : ElectricReading(value, unit, time, alias), InstantReading
 
+    class CurrentAmperage(value: BigDecimal, unit: String, time: LocalDateTime, alias: String)
+        : ElectricReading(value, unit, time, alias), InstantReading
+
     companion object {
         private val counter = AtomicLong(0)
 
