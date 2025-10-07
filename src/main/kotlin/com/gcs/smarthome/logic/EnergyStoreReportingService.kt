@@ -15,8 +15,8 @@ import reactor.core.publisher.Sinks
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
-import javax.annotation.PostConstruct
-import javax.annotation.PreDestroy
+import jakarta.annotation.PostConstruct
+import jakarta.annotation.PreDestroy
 
 @Service
 class EnergyStoreReportingService(private val meterService: MeterService) {

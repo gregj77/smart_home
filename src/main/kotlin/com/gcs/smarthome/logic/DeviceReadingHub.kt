@@ -11,7 +11,7 @@ import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.util.concurrent.atomic.AtomicReference
-import javax.transaction.Transactional
+import jakarta.transaction.Transactional
 
 @Service
 class DeviceReadingHub(private val repository: DeviceReadingRepository)  {

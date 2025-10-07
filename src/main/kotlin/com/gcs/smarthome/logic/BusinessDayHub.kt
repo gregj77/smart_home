@@ -18,7 +18,7 @@ import reactor.core.Disposables
 import reactor.core.publisher.Flux
 import java.time.LocalDate
 import java.time.LocalTime
-import javax.annotation.PreDestroy
+import jakarta.annotation.PreDestroy
 
 @Service
 class BusinessDayHub (private val repository: BusinessDayRepository,

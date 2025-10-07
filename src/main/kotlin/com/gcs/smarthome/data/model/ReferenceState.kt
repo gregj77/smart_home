@@ -3,7 +3,7 @@ package com.gcs.smarthome.data.model
 import org.hibernate.Hibernate
 import java.math.BigDecimal
 import java.time.LocalDateTime
-import javax.persistence.*
+import jakarta.persistence.*
 
 @Entity
 class ReferenceState(

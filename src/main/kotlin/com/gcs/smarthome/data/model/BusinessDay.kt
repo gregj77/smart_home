@@ -2,7 +2,7 @@ package com.gcs.smarthome.data.model
 
 import org.hibernate.Hibernate
 import java.time.LocalDate
-import javax.persistence.*
+import jakarta.persistence.*
 import kotlin.jvm.Transient
 
 @Entity
