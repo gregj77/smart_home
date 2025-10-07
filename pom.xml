@@ -21,7 +21,7 @@
 		<kotlin.logging.version>3.0.5</kotlin.logging.version>
 		<kotlin.compiler.opt-in>kotlin.RequiresOptIn</kotlin.compiler.opt-in>
 		<mysql.connector.version>8.0.33</mysql.connector.version>
-		<junit.engine.version>6.0.0</junit.engine.version>
+		<junit.engine.version>5.12.2</junit.engine.version>
 		<flyway.version>9.22.0</flyway.version>
 	</properties>
 	<dependencies>
@@ -64,6 +64,12 @@
 			<version>${flyway.version}</version>
 		</dependency>
 		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-mysql</artifactId>
+			<version>${flyway.version}</version>
+		</dependency>
+
+		<dependency>
 			<groupId>org.jetbrains.kotlin</groupId>
 			<artifactId>kotlin-reflect</artifactId>
 		</dependency>
@@ -97,6 +103,7 @@
 			<version>${mysql.connector.version}</version>
 			<scope>runtime</scope>
 		</dependency>
+
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -180,7 +187,7 @@
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.8.7</version>
+				<version>0.8.11</version>
 				<executions>
 					<execution>
 						<id>prepare-agent</id>
@@ -245,7 +252,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
-				<version>3.0.0-M5</version>
+				<version>3.1.2</version>
 			</plugin>
 
 			<plugin>
